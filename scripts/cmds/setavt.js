@@ -37,6 +37,26 @@ module.exports = {
 			cannotGetImage: "❌ | An error occurred while querying the image url",
 			invalidImageFormat: "❌ | Invalid image format",
 			changedAvatar: "✅ | Changed bot avatar successfully"
+		},
+		tl: {
+			cannotGetImage: "❌ | Nagkaroon ng error habang kini-query ang image url",
+			invalidImageFormat: "❌ | Hindi wastong format ng larawan",
+			changedAvatar: "✅ | Matagumpay na nabago ang avatar ng bot"
+		},
+		hi: {
+			cannotGetImage: "❌ | Image url query karte waqt error aaya",
+			invalidImageFormat: "❌ | Image format sahi nahi hai",
+			changedAvatar: "✅ | Bot ka avatar successfully badal diya gaya"
+		},
+		ar: {
+			cannotGetImage: "❌ | حدث خطأ أثناء الاستعلام عن رابط الصورة",
+			invalidImageFormat: "❌ | صيغة الصورة غير صحيحة",
+			changedAvatar: "✅ | تم تغيير صورة البوت بنجاح"
+		},
+		bn: {
+			cannotGetImage: "❌ | Image url query করতে error হয়েছে",
+			invalidImageFormat: "❌ | Image format সঠিক নয়",
+			changedAvatar: "✅ | Bot এর avatar সফলভাবে পরিবর্তন হয়েছে"
 		}
 	},
 
