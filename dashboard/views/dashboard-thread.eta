@@ -1,0 +1,144 @@
+<%~ includeFile("partials/header.eta", {
+	user: user
+}); %>
+<%~ includeFile("partials/message.eta"); %>
+<%~ includeFile("partials/title.eta", {
+	icon: "fas fa-cog",
+	title: "Dashboard"
+}); %>
+<%
+	const { threadID } = threadData; 
+%>
+
+<form id="setData" class="container">
+  <br>
+	<div class="bg-300 rounded-5 py-4">
+		<h5 class="text-center">Box Name: <%= threadData.threadName %></h5>
+		<p class="mt-2 mb-0 text-center">Box ID: <%= threadData.threadID %></p>
+	</div>
+
+	<hr>
+
+	<div class="bg-300 rounded-5 py-4 px-4 mt-2" role="button" onclick="window.location.href='/dashboard/<%= threadID %>/welcome'">
+		<div class="row justify-content-between">
+			<div class="col-auto">
+				<h4>👋 Welcome</h4>
+			</div>
+			<div class="col-auto">
+				<label class="switch">
+					<div class="form-check form-switch">
+						<input class="form-check-input" id="sw-welcome" type="checkbox" <%= threadData.settings.sendWelcomeMessage ? 'checked' : '' %>/>
+						<span class="slider round"></span>
+					</div>
+				</label>
+			</div>
+		</div>
+		<p class="text-700 lead fs-1 ms-2 mb-0">Gửi tin nhắn chào mừng thành viên mới!</p>
+	</div>
+
+	<div class="bg-300 rounded-5 py-4 px-4 mt-2" role="button" onclick="window.location.href='/dashboard/<%= threadID %>/leave'">
+		<div class="row justify-content-between">
+			<div class="col-auto">
+				<h4>🤧 Leave</h4>
+			</div>
+			<div class="col-auto">
+				<label class="switch">
+					<div class="form-check form-switch">
+						<input class="form-check-input" id="sw-leave" type="checkbox" <%= threadData.settings.sendLeaveMessage ? 'checked' : '' %>/>
+						<span class="slider round"></span>
+					</div>
+				</label>
+			</div>
+		</div>
+		<p class="text-700 lead fs-1 ms-2 mb-0">Gửi tin nhắn tạm biệt thành viên rời khỏi nhóm!</p>
+	</div>
+
+	<div class="bg-300 rounded-5 py-4 px-4 mt-2" role="button" onclick="window.location.href='/dashboard/<%= threadID %>/rankup'">
+		<div class="row justify-content-between">
+			<div class="col-auto">
+				<h4>🏆 Rankup</h4>
+			</div>
+			<div class="col-auto">
+				<label class="switch">
+					<div class="form-check form-switch">
+						<input class="form-check-input" id="sw-rankup" type="checkbox" <%= threadData.settings.sendRankupMessage ? 'checked' : '' %>/>
+						<span class="slider round"></span>
+					</div>
+				</label>
+			</div>
+		</div>
+		<p class="text-700 lead fs-1 ms-2 mb-0">Gửi tin nhắn thông báo thăng cấp!</p>
+	</div>
+
+	<div class="bg-300 rounded-5 py-4 px-4 mt-2" role="button" onclick="window.location.href='/dashboard/<%= threadID %>/custom-cmd'">
+		<div class="row justify-content-between">
+			<div class="col-auto">
+				<h4>⚙️ Custom command</h4>
+			</div>
+			<div class="col-auto">
+				<label class="switch">
+					<div class="form-check form-switch">
+						<input class="form-check-input" id="sw-customcmd" type="checkbox" <%= threadData.settings.customCommand ? 'checked' : '' %>/>
+						<span class="slider round"></span>
+					</div>
+				</label>
+			</div>
+		</div>
+		<p class="text-700 lead fs-1 ms-2 mb-0">Tùy chỉnh lệnh của bot!</p>
+	</div>
+
+	<input type="hidden" name="threadID" value="<%= threadID %>">
+	<button type="submit" id="save" class="mt-2 btn btn-primary btn-block" <%=authConfigDashboard ? '' : 'disabled'%>>Lưu</button>
+
+</form>
+
+<script type="text/javascript">
+  (function() {
+    const btn = $("#save");
+    btn.on("click", function(e) {
+      e.preventDefault();
+      '<% if (authConfigDashboard) { %>'
+      $.ajax({
+        url: "/api/thread/setData/settings",
+        type: "POST",
+        data: {
+          threadID: "<%= threadID %>",
+          updateData: {
+            sendWelcomeMessage: $("#sw-welcome").is(":checked"),
+            sendLeaveMessage: $("#sw-leave").is(":checked"),
+            sendRankupMessage: $("#sw-rankup").is(":checked"),
+            customCommand: $("#sw-customcmd").is(":checked")
+          }
+        },
+        success: function(data) {
+          $.createToast({
+            title: "Success",
+            type: "success",
+            message: "Cập nhật thành công!"
+          })
+        },
+        error: function(err) {
+          $.createToast({
+            title: "Lỗi",
+            type: "error",
+            message: "Đã xảy ra lỗi!"
+          })
+        }
+      });
+      '<% } else { %>'
+      e.preventDefault();
+      $.createToast({
+        title: "Warnig",
+        message: "[!] Chỉ quản trị viên của nhóm chat hoặc những thành viên được cho phép mới có thể chỉnh sửa dashboard",
+        type: "warning",
+      })
+      '<% } %>'
+    });
+  })();
+
+	// kiểm tra nếu click vào input thì không chuyển trang
+	$("[type='checkbox']").on("click", function(e) {
+		e.stopPropagation();
+	});
+</script>
+<%~ includeFile("partials/footer.eta") %>

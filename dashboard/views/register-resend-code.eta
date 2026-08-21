@@ -1,0 +1,60 @@
+<%~ includeFile("partials/header.eta", {
+	user: user
+}); %>
+<%~ includeFile("partials/message.eta"); %>
+<%~ includeFile("partials/title.eta", {
+	icon: "fa-solid fa-envelope",
+	title: "Resend Email Verification"
+}); %>
+
+<section class="posts">
+  <div class="container my-4">
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card">
+          <div class="card-header">
+            <h3>Resend Email Verification</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input type="email" class="form-control" id="email" name="email" placeholder="Enter email" required>
+            </div>
+            <button type="submit" id="btn-resend-code" class="btn btn-primary mt-3" disabled>Resend</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script type="text/javascript">
+  (function() {
+    $("#btn-resend-code").on("click", function(e) {
+      $.ajax({
+        url: "/register/resend-code",
+        type: "POST",
+        data: "email=" + $("#email").val(),
+        success: function(data) {
+          window.location.href = "/register/submit-code";
+        },
+        error: function(err) {
+          $.createToast({
+            title: "Error",
+            type: "error",
+            message: err.responseJSON.message
+          });
+        }
+      });
+    });
+
+    $("#email").on("keyup", function(e) {
+      if ($(this).val() != "")
+        $("#btn-resend-code").removeAttr("disabled");
+      else
+        $("#btn-resend-code").attr("disabled", "disabled");
+    });
+  })();
+</script>
+
+<%~ includeFile("partials/footer.eta") %>

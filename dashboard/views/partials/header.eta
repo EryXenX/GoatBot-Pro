@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+
+<html data-bs-theme="dark" lang="vi">
+<head>
+	<meta charset="UTF-8">
+	<meta content="width=device-width, initial-scale=1" name="viewport" />
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+	<link rel="stylesheet" href="/css/phoenix.css">
+	<link rel="stylesheet" href="/css/dropzone.css">
+	<link rel="stylesheet" href="/css/custom.css">
+
+	<title>Goat Bot</title>
+	<link rel="icon" href="/images/logo.png" type="image/icon type">
+	
+	<!-- <script src="/js/bootstrap.min.js"></script> -->
+	<!-- <script src="/js/bootstrap.bundle.min.js"></script> -->
+	<!-- <script src="/js/poper.js"></script> -->
+
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
+	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script src="/js/copyToClipboard.js"></script>
+	<script src="/js/list.min.js"></script>
+	<script src="/js/hwt.js"></script>
+
+</head>
+
+<body>
+	<header>
+		<%~ includeFile("./nav.eta", {
+			user: user
+		}); %>
+	</header>
+
+	<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+	<!-- <script src="/js/hwt.js"></script> -->
+	<script src="/js/toast.js"></script>
+
+	<script>
+		$.fn.highlight = function (words) {
+			var id = $(this).attr('id');
+			if (typeof words === "string") words = [words];
+			words = words.map(function (word) {
+				if (typeof word == "string") word = { name: word, desc: "" };
+				return word;
+			});
+			const el = $("#" + id);
+			let text = el.text();
+			for (const value of words) {
+				text = text.replace(new RegExp(value.name, "g"), `<span class="highlight">${value.name}</span>`);
+				el.html(text);
+			}
+			el.focusEnd();
+			return this;
+		}
+
+		$.fn.focusEnd = function () {
+			$(this).focus();
+			var tmp = $('<span />').appendTo($(this)),
+				node = tmp.get(0),
+				range = null,
+				sel = null;
+
+			if (document.selection) {
+				range = document.body.createTextRange();
+				range.moveToElementText(node);
+				range.select();
+			}
+			else if (window.getSelection) {
+				range = document.createRange();
+				range.selectNode(node);
+				sel = window.getSelection();
+				sel.removeAllRanges();
+				sel.addRange(range);
+			}
+			tmp.remove();
+			return this;
+		}
+
+		$.fn.autocomplete = function (arr) {
+			const el = $(this);
+			var id = el.attr('id');
+			var inp = document.getElementById(id);
+			if (typeof arr === "string") arr = [arr];
+			arr = arr.map(function (word) {
+				if (typeof word == "string") word = { name: word, desc: "" };
+				return word;
+			});
+			var currentFocus;
+
+			inp.addEventListener("input", function (e) {
+				var pos = inp.selectionStart;
+				var a, b, i, val = $("#" + this.id).val();
+				const val2 = val.slice(val.lastIndexOf("{"));
+
+				closeAllLists();
+				if (!val) { return false; }
+				currentFocus = -1;
+
+				const newDiv = document.createElement("div");
+				newDiv.setAttribute("class", "autocomplete-list");
+				inp.parentNode.appendChild(newDiv);
+				if (pos != val.length) return;
+				for (const value of arr) {
+					if (value.name.slice(0, val2.length) == val2) {
+						a = document.createElement("div");
+						a.setAttribute("class", "autocomplete-items");
+						newDiv.appendChild(a);
+						b = document.createElement("div");
+						b.setAttribute("class", "change-item");
+						b.innerHTML = "<b>" + value.name.substr(0, val2.length) + "</b>";
+						b.innerHTML += value.name.substr(val2.length);
+						b.innerHTML += "<input type='hidden' value='" + value.name + "'>";
+						b.innerHTML += "<div class=\"desc\">" + value.desc + "</div>";
+						b.addEventListener("click", function (e) {
+							const newVal = val.slice(0, val.lastIndexOf(val2)) + this.getElementsByTagName("input")[0].value;
+							$("#" + inp.id).val(newVal);
+							closeAllLists();
+							el.highlightWithinTextarea({
+								highlight: arr.map(i => i.name)
+							});
+							el.focus();
+						});
+						a.appendChild(b);
+					}
+				}
+			});
+
+			inp.addEventListener("keydown", function (e) {
+				var x = document.getElementsByClassName("autocomplete-list")[0];
+				if (!x) return false;
+				x = x.getElementsByClassName("autocomplete-items");
+				if (!x.length) return false;
+				if (e.keyCode == 40) {
+					currentFocus++;
+					addActive(x);
+				}
+				else if (e.keyCode == 38) {
+					currentFocus--;
+					addActive(x);
+				}
+				else if (e.keyCode == 13) {
+					e.preventDefault();
+					if (currentFocus > -1) {
+						if (x) x[currentFocus].getElementsByClassName("change-item")[0].click();
+						el.highlightWithinTextarea({
+							highlight: arr.map(i => i.name)
+						});
+						el.focus();
+					}
+				}
+			});
+
+			function addActive(x) {
+				if (!x) return false;
+				removeActive(x);
+				if (currentFocus >= x.length) currentFocus = 0;
+				if (currentFocus < 0) currentFocus = (x.length - 1);
+				x[currentFocus].getElementsByTagName("div")[0].classList.remove("autocomplete-item");
+				x[currentFocus].classList.add("autocomplete-active");
+			}
+
+			function removeActive(x) {
+				for (var i = 0; i < x.length; i++) {
+					if (!x[i].getElementsByTagName("div")[0].classList.value.includes("autocomplete-item")) {
+						x[i].getElementsByTagName("div")[0].classList.add("autocomplete-item");
+					}
+					x[i].classList.remove("autocomplete-active");
+				}
+			}
+
+			function closeAllLists(elmnt) {
+				$(".autocomplete-list").remove();
+				var x = document.getElementsByClassName("autocomplete-items");
+				for (var i = 0; i < x.length; i++) {
+					if (elmnt != x[i] && elmnt != inp) {
+						x[i].parentNode.removeChild(x[i]);
+					}
+				}
+			}
+
+			document.addEventListener("click", function (e) {
+				closeAllLists(e.target);
+			});
+			return this;
+		}
+	</script>
+
+	<div style="padding-top: calc(var(--phoenix-navbar-top-height))">
