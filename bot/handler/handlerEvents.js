@@ -1,4 +1,5 @@
 const fs = require("fs-extra");
+const path = require("path");
 const nullAndUndefined = [undefined, null];
 // const { config } = global.GoatBot;
 // const { utils } = global;
@@ -191,6 +192,46 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 
 		if (typeof threadData.settings.hideNotiMessage == "object")
 			hideNotiMessage = threadData.settings.hideNotiMessage;
+
+		// Mark the incoming message as read/seen before the bot replies —
+		// a real client always does this, and a bot account that only ever
+		// sends outbound messages and never sends read receipts is an easy
+		// behavioral signal for automation detection. Fire-and-forget so it
+		// never adds latency to the actual reply; skipped for E2EE threads
+		// since markAsRead isn't meaningful there. Respects the existing
+		// `autoseen` on/off toggle (scripts/cmds/autoseen.js).
+		if (!event.isE2EE && event.type !== "typ" && event.type !== "presence" && typeof api.markAsRead === "function") {
+			try {
+				const autoseenPath = path.join(__dirname, "..", "..", "scripts/cmds/cache/autoseen.json");
+				const autoseenOn = !fs.existsSync(autoseenPath) || (fs.readJsonSync(autoseenPath, { throws: false }) || { status: true }).status !== false;
+				if (autoseenOn) {
+					api.markAsRead(threadID).catch(() => {});
+				}
+			} catch { }
+		}
+
+		// Same idea as markAsRead above, but for the "delivered" receipt —
+		// a real client sends both automatically. Also fire-and-forget,
+		// also invisible/instant, no user-facing delay either way.
+		if (!event.isE2EE && event.type !== "typ" && event.type !== "presence" && typeof api.markAsDelivered === "function") {
+			try {
+				api.markAsDelivered(threadID, event.messageID).catch(() => {});
+			} catch { }
+		}
+
+		// Typing indicator — off by default (config.enableTypingIndicator),
+		// since unlike markAsRead/markAsDelivered this one is visible and
+		// adds a real delay before the reply shows up. Only meaningful for
+		// actual chat messages, not reactions/other event types.
+		if (!event.isE2EE && event.type === "message" && global.GoatBot.config.enableTypingIndicator === true && typeof api.sendTypingIndicator === "function") {
+			try {
+				api.sendTypingIndicator(threadID, true).catch(() => {});
+				const typingDuration = Number(global.GoatBot.config.typingDuration) || 2000;
+				setTimeout(() => {
+					try { api.sendTypingIndicator(threadID, false).catch(() => {}); } catch { }
+				}, typingDuration);
+			} catch { }
+		}
 
 		const prefix = event.isE2EE ? config.prefix : getPrefix(threadID);
 		const role = getRole(threadData, senderID);

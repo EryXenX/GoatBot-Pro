@@ -12,8 +12,11 @@
   "antiInbox": false,
   "language": "en",
   "notesLanguage": "change language using ISO 639-1 code",
-  "nickNameBot": "—͞ 𝐐𝐔𝐄𝐄𝐍 🎀❤️‍🩹",
+  "nickNameBot": "XUDI OKAY?",
   "prefix": "/",
+  "enableTypingIndicator": false,
+  "typingDuration": 2000,
+  "notesTypingIndicator": "true = show 'is typing...' before every reply (more human-like, adds visible delay) | false = reply instantly, no typing shown",
   "noPrefix": {
     "enable": true,
     "notes": "true = only bot admins can use commands without prefix | false = everyone must use prefix"
@@ -23,7 +26,7 @@
     "ignoreCommand": []
   },
   "adminBot": [
-    "61583835186508",
+    "61592832917083",
     " ",
     " "
   ],
@@ -37,10 +40,10 @@
     "notes": "If enable = true, bot will unsend any message reacted with these emojis. If onlyAdmin = true, only adminBot IDs can trigger it."
   },
   "whiteListMode": {
-    "enable": false,
+    "enable": true,
     "whiteListIds": [
-      "100083039411474",
-      "100063840894133"
+      "",
+      ""
     ],
     "notes": "If enabled, only IDs in whiteListIds can use the bot."
   },
@@ -152,7 +155,7 @@
     "updatePresence": true,
     "listenTyping": true,
     "logLevel": "error",
-    "selfListen": false,
+    "selfListen": true,
     "selfListenEvent": true,
     "autoMarkDelivery": false,
     "autoReconnect": true,
