@@ -128,7 +128,7 @@ module.exports = async function (api, createLine) {
 	console.log(header("💻 SYSTEM READY"));
 
 	if (api && typeof api._connectE2EEAndMerge === "function") {
-		api._connectE2EEAndMerge();
+		await api._connectE2EEAndMerge();
 	}
 
 	return {
