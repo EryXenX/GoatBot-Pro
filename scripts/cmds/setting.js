@@ -127,7 +127,8 @@ const CATEGORIES = [
 		items: [
 			{ num: 8, label: "FCA Options" },
 			{ num: 13, label: "Restart Listen MQTT" },
-			{ num: 14, label: "MQTT Error Notify" }
+			{ num: 14, label: "MQTT Error Notify" },
+			{ num: 18, label: "E2EE" }
 		]
 	},
 	{
@@ -171,7 +172,7 @@ module.exports = {
 	config: {
 		name: "setting",
 		aliases: ["settings"],
-		version: "4.0.0",
+		version: "5.0.0",
 		author: "EryXenX",
 		countDown: 5,
 		role: 2,
@@ -453,6 +454,12 @@ module.exports = {
 					"› Reply 1-7"
 				].join("\n");
 				return await sendAndListen(menu, "credentials");
+			}
+			if (num === 18) {
+				config.e2ee = config.e2ee || {};
+				config.e2ee.enable = !config.e2ee.enable;
+				saveConfig();
+				return message.reply(`✦ E2EE — ${status(config.e2ee.enable)}\n⚠️ Needs a bot restart to take effect.`);
 			}
 		}
 
