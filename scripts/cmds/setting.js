@@ -195,7 +195,7 @@ module.exports = {
 	config: {
 		name: "setting",
 		aliases: ["settings"],
-		version: "4.0.0",
+		version: "8.0.0",
 		author: "EryXenX",
 		countDown: 5,
 		role: 2,
