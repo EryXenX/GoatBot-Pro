@@ -5,7 +5,7 @@
 <br/>
 
 ![Version](https://img.shields.io/badge/Version-2.0.0-00FFD1?style=for-the-badge&logo=github&logoColor=black)
-![Node](https://img.shields.io/badge/Node.js-18.x-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Node](https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
 ![Base](https://img.shields.io/badge/Based_on-Goat_Bot_V2-FF6B6B?style=for-the-badge&logo=github&logoColor=white)
 ![Fork](https://img.shields.io/badge/Fork_by-EryXenX-9B59B6?style=for-the-badge&logo=github&logoColor=white)
 ![FCA](https://img.shields.io/badge/FCA-fca--eryxenx-00FFD1?style=for-the-badge&logoColor=black)
@@ -280,6 +280,28 @@ only connects once, at login).
 ```json
 "e2ee": { "enable": false }
 ```
+
+---
+
+## ◈ Command Anti-Spam (Humanizer)
+
+Every command reply goes through `@eryxenx/fca`'s built-in humanizer —
+the bot waits a short, randomized delay (2-3s by default) before replying
+to a command, shows the typing indicator for exactly that window, and
+enforces a per-thread cooldown so command spam gets dropped instead of
+flooding replies. Plain chat (non-commands) is untouched — no delay, no
+typing.
+
+This applies automatically to:
+- normal prefixed commands (`/help`, etc.)
+- no-prefix admin commands (when `config.noPrefix.enable: true`)
+- `onChat` triggers (e.g. typing `prefix` with no `/`)
+- `onReply` flows — including multi-step ones like `{prefix}setting`'s
+  "reply with a number" menus
+
+No setup needed on the GoatBot side — it's active as soon as the bot logs
+in. See `@eryxenx/fca`'s own README for configuration options
+(`reactDelayMs`, `cooldownMs`, `maxPerMinute`, disabling it entirely, etc.).
 
 ---
 
