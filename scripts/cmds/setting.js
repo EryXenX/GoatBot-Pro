@@ -18,6 +18,37 @@ function status(val) {
 	return val ? "ON ✦" : "OFF ◌";
 }
 
+function wrapItem(text, maxWidth) {
+	const words = text.split(" ");
+	const lines = [];
+	let cur = "";
+	for (const w of words) {
+		const test = cur ? `${cur} ${w}` : w;
+		if (test.length > maxWidth && cur) {
+			lines.push(cur);
+			cur = w;
+		} else {
+			cur = test;
+		}
+	}
+	if (cur) lines.push(cur);
+	return lines;
+}
+
+function renderBox(headerIcon, headerTitle, subtitleLines, boxLabel, itemLines, footer) {
+	const lines = [`╭─ ${headerIcon} ${headerTitle.toUpperCase()}`];
+	subtitleLines.forEach(l => lines.push(`├ ${l}`));
+	lines.push("");
+	lines.push(`┌─ ${boxLabel.toUpperCase()} ─┐`);
+	itemLines.forEach(item => {
+		wrapItem(item, 22).forEach(w => lines.push(`│ ${w}`));
+	});
+	lines.push("└─────────────┘");
+	lines.push("");
+	lines.push(`╰─ ${footer}`);
+	return lines.join("\n");
+}
+
 function masked(val) {
 	if (val === undefined || val === null || val === "" || val === " ") return "Not set ✕";
 	return "Set ✦ (" + String(val).length + " chars)";
@@ -89,12 +120,8 @@ const BOOL_GROUPS = {
 function renderBoolGroupMenu(config, groupKey) {
 	const group = BOOL_GROUPS[groupKey];
 	const sub = getPath(config, group.path) || {};
-	const lines = [group.title, "━━━━━━━━━━━━━━━━━"];
-	group.items.forEach(([key, label], i) => {
-		lines.push(`${i + 1}. ${label} — ${status(sub[key])}`);
-	});
-	lines.push("━━━━━━━━━━━━━━━━━", "› Reply a number to toggle, or 0 to go back");
-	return lines.join("\n");
+	const itemLines = group.items.map(([key, label], i) => `${i + 1}. ${label} — ${status(sub[key])}`);
+	return renderBox("⚙️", group.title.replace(/^[^\w]*/, "").trim(), [`Items : ${group.items.length}`], "toggles", itemLines, "Reply a number to toggle, or 0 to go back");
 }
 
 const CATEGORIES = [
@@ -154,25 +181,21 @@ const CATEGORIES = [
 ];
 
 function renderCategoryList() {
-	const lines = ["⚙️ Bot Settings", "━━━━━━━━━━━━━━━━━"];
-	CATEGORIES.forEach((cat, i) => lines.push(`${i + 1}. ${cat.title}`));
-	lines.push("━━━━━━━━━━━━━━━━━", `› Reply 1-${CATEGORIES.length} to enter a category`);
-	return lines.join("\n");
+	const itemLines = CATEGORIES.map((cat, i) => `${i + 1}. ${cat.title.replace(/^[^\w]*/, "").trim()}`);
+	return renderBox("⚙️", "Bot Settings", [`Categories : ${CATEGORIES.length}`, "Author : EryXenX"], "categories", itemLines, `Reply 1-${CATEGORIES.length} to enter a category`);
 }
 
 function renderCategoryItems(catIndex) {
 	const cat = CATEGORIES[catIndex];
-	const lines = [cat.title, "━━━━━━━━━━━━━━━━━"];
-	cat.items.forEach((item, i) => lines.push(`${i + 1}. ${item.label}`));
-	lines.push("━━━━━━━━━━━━━━━━━", "› Reply a number, or 0 to go back to categories");
-	return lines.join("\n");
+	const itemLines = cat.items.map((item, i) => `${i + 1}. ${item.label}`);
+	return renderBox("🧩", cat.title.replace(/^[^\w]*/, "").trim(), [`Items : ${cat.items.length}`], "items", itemLines, "Reply a number, or 0 to go back to categories");
 }
 
 module.exports = {
 	config: {
 		name: "setting",
 		aliases: ["settings"],
-		version: "5.0.0",
+		version: "4.0.0",
 		author: "EryXenX",
 		countDown: 5,
 		role: 2,
@@ -251,188 +274,137 @@ module.exports = {
 		if (state === "categoryItems" || state === "itemMenu") {
 			if (num === 1) {
 				const fb = config.facebookAccount || {};
-				const menu = [
-					"👤 Facebook Account",
-					"━━━━━━━━━━━━━━━━━",
-					`1. Email — ${fb.email || "Not set ✕"}`,
-					`2. Password — ${masked(fb.password)}`,
-					`3. 2FA Secret — ${masked(fb["2FASecret"])}`,
-					`4. i_user — ${masked(fb.i_user)}`,
-					`5. Proxy — ${fb.proxy || "Not set ✕"}`,
-					`6. User Agent — ${fb.userAgent ? "Set ✦" : "Not set ✕"}`,
-					`7. Cookie Refresh Interval — ${fb.intervalGetNewCookie ?? "Not set"} min`,
-					"━━━━━━━━━━━━━━━━━",
-					"⚠️ Changes here need a bot restart to take effect.",
-					"› Reply 1-7"
-				].join("\n");
+				const menu = renderBox("👤", "Facebook Account", [], "fields", [
+					`1. ${"Email"} — ${fb.email || "Not set ✕"}`,
+					`2. ${"Password"} — ${masked(fb.password)}`,
+					`3. ${"2FA Secret"} — ${masked(fb["2FASecret"])}`,
+					`4. ${"i_user"} — ${masked(fb.i_user)}`,
+					`5. ${"Proxy"} — ${fb.proxy || "Not set ✕"}`,
+					`6. ${"User Agent"} — ${fb.userAgent ? "Set ✦" : "Not set ✕"}`,
+					`7. ${"Cookie Refresh Interval"} — ${fb.intervalGetNewCookie ?? "Not set"} min`
+				], "Reply 1-7 · ⚠️ needs a bot restart to take effect");
 				return await sendAndListen(menu, "fbAccount");
 			}
 			if (num === 2) {
-				const menu = [
-					"🤖 Bot Behavior",
-					"━━━━━━━━━━━━━━━━━",
-					`1. Prefix — ${config.prefix || "/"}`,
-					`2. Language — ${config.language || "en"}`,
-					`3. Time Zone — ${config.timeZone || "Not set"}`,
-					`4. Anti Inbox — ${status(config.antiInbox)}`,
-					`5. Admin Only — ${status(config.adminOnly?.enable)}`,
-					`6. Only Admin Box — ${status(config.onlyAdminBox)}`,
-					`7. Auto Refresh Fbstate — ${status(config.autoRefreshFbstate)}`,
-					`8. Auto Relogin On Account Change — ${status(config.autoReloginWhenChangeAccount)}`,
-					`9. Auto Restart On MQTT Error — ${status(config.autoRestartWhenListenMqttError)}`,
-					`10. Auto Restart Time (cron/ms) — ${config.autoRestart?.time ?? "Not set"}`,
-					"━━━━━━━━━━━━━━━━━",
-					"› Reply 1-10"
-				].join("\n");
+				const menu = renderBox("🤖", "Bot Behavior", [], "fields", [
+					`1. ${"Prefix"} — ${config.prefix || "/"}`,
+					`2. ${"Language"} — ${config.language || "en"}`,
+					`3. ${"Time Zone"} — ${config.timeZone || "Not set"}`,
+					`4. ${"Anti Inbox"} — ${status(config.antiInbox)}`,
+					`5. ${"Admin Only"} — ${status(config.adminOnly?.enable)}`,
+					`6. ${"Only Admin Box"} — ${status(config.onlyAdminBox)}`,
+					`7. ${"Auto Refresh Fbstate"} — ${status(config.autoRefreshFbstate)}`,
+					`8. ${"Auto Relogin On Account Change"} — ${status(config.autoReloginWhenChangeAccount)}`,
+					`9. ${"Auto Restart On MQTT Error"} — ${status(config.autoRestartWhenListenMqttError)}`,
+					`10. ${"Auto Restart Time (cron/ms)"} — ${config.autoRestart?.time ?? "Not set"}`
+				], "Reply 1-10");
 				return await sendAndListen(menu, "botBehavior");
 			}
 			if (num === 3) {
-				const menu = [
-					"⚙️ Admin Manage",
-					"━━━━━━━━━━━━━━━━━",
-					"1. Add Admin",
-					"2. Remove Admin",
-					"3. List Admins",
-					"━━━━━━━━━━━━━━━━━",
-					"› Reply 1-3"
-				].join("\n");
+				const menu = renderBox("⚙️", "Admin Manage", [], "actions", [
+					`1. ${"Add Admin"}`,
+					`2. ${"Remove Admin"}`,
+					`3. ${"List Admins"}`
+				], "Reply 1-3");
 				return await sendAndListen(menu, "adminManage");
 			}
 			if (num === 4) {
-				const menu = [
-					"⚙️ Whitelist Manage",
-					"━━━━━━━━━━━━━━━━━",
-					`1. Thread Whitelist — ${status(config.whiteListModeThread?.enable)}`,
-					"2. Add Thread",
-					"3. Remove Thread",
-					`4. User Whitelist — ${status(config.whiteListMode?.enable)}`,
-					"5. Add User",
-					"6. Remove User",
-					"━━━━━━━━━━━━━━━━━",
-					"› Reply 1-6"
-				].join("\n");
+				const menu = renderBox("⚙️", "Whitelist Manage", [], "actions", [
+					`1. ${"Thread Whitelist"} — ${status(config.whiteListModeThread?.enable)}`,
+					`2. ${"Add Thread"}`,
+					`3. ${"Remove Thread"}`,
+					`4. ${"User Whitelist"} — ${status(config.whiteListMode?.enable)}`,
+					`5. ${"Add User"}`,
+					`6. ${"Remove User"}`
+				], "Reply 1-6");
 				return await sendAndListen(menu, "whitelist");
 			}
 			if (num === 5) {
 				config.noPrefix = config.noPrefix || {};
 				config.noPrefix.enable = !config.noPrefix.enable;
 				saveConfig();
-				return message.reply(`✦ No Prefix — ${status(config.noPrefix.enable)}`);
+				return message.reply(`✦ No Prefix is now ${status(config.noPrefix.enable)}`);
 			}
 			if (num === 6) {
-				const menu = [
-					"⚙️ React Unsend",
-					"━━━━━━━━━━━━━━━━━",
-					`1. Toggle — ${status(config.reactUnsend?.enable)}`,
-					`2. Only Admin — ${status(config.reactUnsend?.onlyAdmin)}`,
-					"3. Add Emoji",
-					"4. Remove Emoji",
-					"5. List Emojis",
-					"━━━━━━━━━━━━━━━━━",
-					"› Reply 1-5"
-				].join("\n");
+				const menu = renderBox("⚙️", "React Unsend", [], "fields", [
+					`1. ${"Toggle"} — ${status(config.reactUnsend?.enable)}`,
+					`2. ${"Only Admin"} — ${status(config.reactUnsend?.onlyAdmin)}`,
+					`3. ${"Add Emoji"}`,
+					`4. ${"Remove Emoji"}`,
+					`5. ${"List Emojis"}`
+				], "Reply 1-5");
 				return await sendAndListen(menu, "reactUnsend");
 			}
 			if (num === 7) {
 				const current = config.nickNameBot || "Not set";
-				const menu = [
-					"⚙️ Nickname",
-					"━━━━━━━━━━━━━━━━━",
-					`› Current: ${current}`,
-					"━━━━━━━━━━━━━━━━━",
-					"1. Set Nickname (this group)",
-					"2. Set Nickname (all groups)",
-					"3. Reset Nickname",
-					"━━━━━━━━━━━━━━━━━",
-					"› Reply 1-3"
-				].join("\n");
+				const menu = renderBox("⚙️", "Nickname", [`Current : ${current}`], "actions", [
+					`1. ${"Set Nickname (this group)"}`,
+					`2. ${"Set Nickname (all groups)"}`,
+					`3. ${"Reset Nickname"}`
+				], "Reply 1-3");
 				return await sendAndListen(menu, "nickname");
 			}
 			if (num === 8) return await sendAndListen(renderBoolGroupMenu(config, "fcaOptions"), "fcaOptions");
 			if (num === 9) {
-				const menu = [
-					"⚙️ Typing Indicator",
-					"━━━━━━━━━━━━━━━━━",
-					`1. Toggle — ${status(config.enableTypingIndicator)}`,
-					`2. Duration — ${config.typingDuration || 2000}ms`,
-					"━━━━━━━━━━━━━━━━━",
-					"› Reply 1-2"
-				].join("\n");
+				const menu = renderBox("⚙️", "Typing Indicator", [], "fields", [
+					`1. ${"Toggle"} — ${status(config.enableTypingIndicator)}`,
+					`2. ${"Duration"} — ${config.typingDuration || 2000}ms`
+				], "Reply 1-2");
 				return await sendAndListen(menu, "typingIndicator");
 			}
 			if (num === 10) {
 				const db = config.database || {};
-				const menu = [
-					"🗄️ Database",
-					"━━━━━━━━━━━━━━━━━",
-					`1. Type — ${db.type || "Not set"} (needs restart to change)`,
-					`2. MongoDB URI — ${masked(db.uriMongodb)}`,
-					`3. Auto Sync When Start — ${status(db.autoSyncWhenStart)}`,
-					`4. Auto Refresh Thread Info (first time) — ${status(db.autoRefreshThreadInfoFirstTime)}`,
-					"━━━━━━━━━━━━━━━━━",
-					"› Reply 1-4"
-				].join("\n");
+				const menu = renderBox("🗄️", "Database", [], "fields", [
+					`1. ${"Type"} — ${db.type || "Not set"} (needs restart to change)`,
+					`2. ${"MongoDB URI"} — ${masked(db.uriMongodb)}`,
+					`3. ${"Auto Sync When Start"} — ${status(db.autoSyncWhenStart)}`,
+					`4. ${"Auto Refresh Thread Info (first time)"} — ${status(db.autoRefreshThreadInfoFirstTime)}`
+				], "Reply 1-4");
 				return await sendAndListen(menu, "database");
 			}
 			if (num === 11) {
 				const dash = config.dashBoard || {};
 				const up = config.serverUptime || {};
 				const auto = config.autoUptime || {};
-				const menu = [
-					"📊 Dashboard & Uptime",
-					"━━━━━━━━━━━━━━━━━",
-					`1. Dashboard Enable — ${status(dash.enable)}`,
-					`2. Dashboard Port — ${dash.port ?? "Not set"}`,
-					`3. Dashboard Verify Code Expiry (ms) — ${dash.expireVerifyCode ?? "Not set"}`,
-					`4. Server Uptime Enable — ${status(up.enable)}`,
-					`5. Server Uptime Port — ${up.port ?? "Not set"}`,
-					`6. Server Uptime Socket Enable — ${status(up.socket?.enable)}`,
-					`7. Server Uptime Channel Name — ${up.socket?.channelName || "Not set"}`,
-					`8. Auto Uptime Enable — ${status(auto.enable)}`,
-					`9. Auto Uptime Interval (s) — ${auto.timeInterval ?? "Not set"}`,
-					`10. Auto Uptime URL — ${auto.url || "Not set"}`,
-					"━━━━━━━━━━━━━━━━━",
-					"› Reply 1-10"
-				].join("\n");
+				const menu = renderBox("📊", "Dashboard & Uptime", [], "fields", [
+					`1. ${"Dashboard Enable"} — ${status(dash.enable)}`,
+					`2. ${"Dashboard Port"} — ${dash.port ?? "Not set"}`,
+					`3. ${"Dashboard Verify Code Expiry (ms)"} — ${dash.expireVerifyCode ?? "Not set"}`,
+					`4. ${"Server Uptime Enable"} — ${status(up.enable)}`,
+					`5. ${"Server Uptime Port"} — ${up.port ?? "Not set"}`,
+					`6. ${"Server Uptime Socket Enable"} — ${status(up.socket?.enable)}`,
+					`7. ${"Server Uptime Channel Name"} — ${up.socket?.channelName || "Not set"}`,
+					`8. ${"Auto Uptime Enable"} — ${status(auto.enable)}`,
+					`9. ${"Auto Uptime Interval (s)"} — ${auto.timeInterval ?? "Not set"}`,
+					`10. ${"Auto Uptime URL"} — ${auto.url || "Not set"}`
+				], "Reply 1-10");
 				return await sendAndListen(menu, "dashboardUptime");
 			}
 			if (num === 12) {
 				const a = config.autoLoadScripts || {};
-				const menu = [
-					"📜 Auto Load Scripts",
-					"━━━━━━━━━━━━━━━━━",
-					`1. Enable — ${status(a.enable)}`,
-					`2. Ignore Commands — ${a.ignoreCmds || "(none)"}`,
-					`3. Ignore Events — ${a.ignoreEvents || "(none)"}`,
-					"━━━━━━━━━━━━━━━━━",
-					"› Reply 1-3"
-				].join("\n");
+				const menu = renderBox("📜", "Auto Load Scripts", [], "fields", [
+					`1. ${"Enable"} — ${status(a.enable)}`,
+					`2. ${"Ignore Commands"} — ${a.ignoreCmds || "(none)"}`,
+					`3. ${"Ignore Events"} — ${a.ignoreEvents || "(none)"}`
+				], "Reply 1-3");
 				return await sendAndListen(menu, "autoLoadScripts");
 			}
 			if (num === 13) {
 				const r = config.restartListenMqtt || {};
-				const menu = [
-					"🔁 Restart Listen MQTT",
-					"━━━━━━━━━━━━━━━━━",
-					`1. Enable — ${status(r.enable)}`,
-					`2. Restart Interval (ms) — ${r.timeRestart ?? "Not set"}`,
-					`3. Delay After Stop (ms) — ${r.delayAfterStopListening ?? "Not set"}`,
-					`4. Log Notification — ${status(r.logNoti)}`,
-					"━━━━━━━━━━━━━━━━━",
-					"› Reply 1-4"
-				].join("\n");
+				const menu = renderBox("🔁", "Restart Listen MQTT", [], "fields", [
+					`1. ${"Enable"} — ${status(r.enable)}`,
+					`2. ${"Restart Interval (ms)"} — ${r.timeRestart ?? "Not set"}`,
+					`3. ${"Delay After Stop (ms)"} — ${r.delayAfterStopListening ?? "Not set"}`,
+					`4. ${"Log Notification"} — ${status(r.logNoti)}`
+				], "Reply 1-4");
 				return await sendAndListen(menu, "restartListenMqtt");
 			}
 			if (num === 14) {
-				const menu = [
-					"🔔 MQTT Error Notify",
-					"━━━━━━━━━━━━━━━━━",
-					"1. Gmail",
-					"2. Telegram",
-					"3. Discord",
-					"━━━━━━━━━━━━━━━━━",
-					"› Reply 1-3"
-				].join("\n");
+				const menu = renderBox("🔔", "MQTT Error Notify", [], "channels", [
+					`1. ${"Gmail"}`,
+					`2. ${"Telegram"}`,
+					`3. ${"Discord"}`
+				], "Reply 1-3");
 				return await sendAndListen(menu, "notiMqttPick");
 			}
 			if (num === 15) return await sendAndListen(renderBoolGroupMenu(config, "hideNoti"), "hideNoti");
@@ -440,26 +412,30 @@ module.exports = {
 			if (num === 17) {
 				const g = config.credentials?.gmailAccount || {};
 				const r = config.credentials?.gRecaptcha || {};
-				const menu = [
-					"🔑 Credentials",
-					"━━━━━━━━━━━━━━━━━",
-					`1. Gmail Email — ${g.email || "Not set ✕"}`,
-					`2. Gmail Client ID — ${masked(g.clientId)}`,
-					`3. Gmail Client Secret — ${masked(g.clientSecret)}`,
-					`4. Gmail Refresh Token — ${masked(g.refreshToken)}`,
-					`5. Gmail API Key — ${masked(g.apiKey)}`,
-					`6. reCAPTCHA Site Key — ${masked(r.siteKey)}`,
-					`7. reCAPTCHA Secret Key — ${masked(r.secretKey)}`,
-					"━━━━━━━━━━━━━━━━━",
-					"› Reply 1-7"
-				].join("\n");
+				const menu = renderBox("🔑", "Credentials", [], "fields", [
+					`1. ${"Gmail Email"} — ${g.email || "Not set ✕"}`,
+					`2. ${"Gmail Client ID"} — ${masked(g.clientId)}`,
+					`3. ${"Gmail Client Secret"} — ${masked(g.clientSecret)}`,
+					`4. ${"Gmail Refresh Token"} — ${masked(g.refreshToken)}`,
+					`5. ${"Gmail API Key"} — ${masked(g.apiKey)}`,
+					`6. ${"reCAPTCHA Site Key"} — ${masked(r.siteKey)}`,
+					`7. ${"reCAPTCHA Secret Key"} — ${masked(r.secretKey)}`
+				], "Reply 1-7");
 				return await sendAndListen(menu, "credentials");
 			}
 			if (num === 18) {
 				config.e2ee = config.e2ee || {};
-				config.e2ee.enable = !config.e2ee.enable;
+				const was = config.e2ee.enable;
+				config.e2ee.enable = !was;
 				saveConfig();
-				return message.reply(`✦ E2EE — ${status(config.e2ee.enable)}\n⚠️ Needs a bot restart to take effect.`);
+				const sent = await message.reply(`✦ E2EE is now ${status(config.e2ee.enable)}\n⚠️ Needs a bot restart to take effect.\n› React to this message to restart now, or select E2EE again later to switch it back without restarting.`);
+				global.GoatBot.onReaction.set(sent.messageID, {
+					commandName: "setting",
+					messageID: sent.messageID,
+					type: "e2eeRestartConfirm",
+					author
+				});
+				return;
 			}
 		}
 
@@ -558,14 +534,14 @@ module.exports = {
 			if (num === 2) {
 				const admins = config.adminBot || [];
 				if (!admins.length) return message.reply("𝗫 No admins found.");
-				const list = admins.map((id, i) => `${i + 1}. ${id}`).join("\n");
-				await message.reply(`⚙️ Select admin to remove:\n━━━━━━━━━━━━━━━━━\n${list}\n━━━━━━━━━━━━━━━━━\n› Reply number`);
+				const list = admins.map((id, i) => `${i + 1}. ${id}`);
+				await message.reply(renderBox("⚙️", "Remove Admin", [], "admins", list, "Reply number"));
 				return await sendAndListen("› Waiting...", "adminRemoveSelect");
 			}
 			if (num === 3) {
 				const admins = config.adminBot || [];
 				if (!admins.length) return message.reply("𝗫 No admins found.");
-				return message.reply(`⚙️ Admins:\n━━━━━━━━━━━━━━━━━\n› ${admins.join("\n› ")}`);
+				return message.reply(renderBox("⚙️", "Admins", [], "list", admins.map((id, i) => `${i + 1}. ${id}`), "Reply 1 to go back to categories"));
 			}
 		}
 
@@ -595,28 +571,28 @@ module.exports = {
 				config.whiteListModeThread = config.whiteListModeThread || {};
 				config.whiteListModeThread.enable = !config.whiteListModeThread.enable;
 				saveConfig();
-				return message.reply(`✦ Thread Whitelist — ${status(config.whiteListModeThread.enable)}`);
+				return message.reply(`✦ Thread Whitelist is now ${status(config.whiteListModeThread.enable)}`);
 			}
 			if (num === 2) return await sendAndListen("› Reply with Thread ID to add:", "threadAdd");
 			if (num === 3) {
 				const threads = config.whiteListModeThread?.whiteListThreadIds || [];
 				if (!threads.length) return message.reply("𝗫 No threads found.");
-				const list = threads.map((id, i) => `${i + 1}. ${id}`).join("\n");
-				await message.reply(`⚙️ Select thread to remove:\n━━━━━━━━━━━━━━━━━\n${list}\n━━━━━━━━━━━━━━━━━\n› Reply number`);
+				const list = threads.map((id, i) => `${i + 1}. ${id}`);
+				await message.reply(renderBox("⚙️", "Remove Thread", [], "threads", list, "Reply number"));
 				return await sendAndListen("› Waiting...", "threadRemoveSelect");
 			}
 			if (num === 4) {
 				config.whiteListMode = config.whiteListMode || {};
 				config.whiteListMode.enable = !config.whiteListMode.enable;
 				saveConfig();
-				return message.reply(`✦ User Whitelist — ${status(config.whiteListMode.enable)}`);
+				return message.reply(`✦ User Whitelist is now ${status(config.whiteListMode.enable)}`);
 			}
 			if (num === 5) return await sendAndListen("› Reply with UID or tag user to add:", "userAdd");
 			if (num === 6) {
 				const users = config.whiteListMode?.whiteListIds || [];
 				if (!users.length) return message.reply("𝗫 No users found.");
-				const list = users.map((id, i) => `${i + 1}. ${id}`).join("\n");
-				await message.reply(`⚙️ Select user to remove:\n━━━━━━━━━━━━━━━━━\n${list}\n━━━━━━━━━━━━━━━━━\n› Reply number`);
+				const list = users.map((id, i) => `${i + 1}. ${id}`);
+				await message.reply(renderBox("⚙️", "Remove User", [], "users", list, "Reply number"));
 				return await sendAndListen("› Waiting...", "userRemoveSelect");
 			}
 		}
@@ -681,14 +657,14 @@ module.exports = {
 			if (num === 4) {
 				const emojis = config.reactUnsend?.emojis || [];
 				if (!emojis.length) return message.reply("𝗫 No emojis found.");
-				const list = emojis.map((e, i) => `${i + 1}. ${e}`).join("\n");
-				await message.reply(`⚙️ Select emoji to remove:\n━━━━━━━━━━━━━━━━━\n${list}\n━━━━━━━━━━━━━━━━━\n› Reply number`);
+				const list = emojis.map((e, i) => `${i + 1}. ${e}`);
+				await message.reply(renderBox("⚙️", "Remove Emoji", [], "emojis", list, "Reply number"));
 				return await sendAndListen("› Waiting...", "emojiRemoveSelect");
 			}
 			if (num === 5) {
 				const emojis = config.reactUnsend?.emojis || [];
 				if (!emojis.length) return message.reply("𝗫 No emojis.");
-				return message.reply(`⚙️ Emojis:\n━━━━━━━━━━━━━━━━━\n› ${emojis.join("  ")}`);
+				return message.reply(renderBox("⚙️", "Emojis", [], "list", [emojis.join("  ")], "Reply 1 to go back to categories"));
 			}
 		}
 
@@ -913,7 +889,11 @@ module.exports = {
 			config.notiWhenListenMqttError = config.notiWhenListenMqttError || {};
 			config.notiWhenListenMqttError.gmail = config.notiWhenListenMqttError.gmail || {};
 			if (num === 0) {
-				const menu = ["🔔 MQTT Error Notify", "━━━━━━━━━━━━━━━━━", "1. Gmail", "2. Telegram", "3. Discord", "━━━━━━━━━━━━━━━━━", "› Reply 1-3"].join("\n");
+				const menu = renderBox("🔔", "MQTT Error Notify", [], "channels", [
+					`1. ${"Gmail"}`,
+					`2. ${"Telegram"}`,
+					`3. ${"Discord"}`
+				], "Reply 1-3");
 				return await sendAndListen(menu, "notiMqttPick");
 			}
 			if (num === 1) {
@@ -990,5 +970,16 @@ module.exports = {
 			saveConfig();
 			return message.reply("✦ Updated.");
 		}
+	},
+
+	onReaction: async function ({ api, event, Reaction, message }) {
+		if (Reaction.type !== "e2eeRestartConfirm") return;
+		if (event.userID !== Reaction.author) return;
+
+		const fs = require("fs");
+		const pathFile = `${__dirname}/tmp/restart.txt`;
+		fs.writeFileSync(pathFile, `${event.threadID} ${Date.now()}`);
+		await message.reply("🔄 | Restarting bot to apply E2EE change...");
+		process.exit(2);
 	}
 };
