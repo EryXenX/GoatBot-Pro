@@ -88,6 +88,49 @@ Add your Facebook cookies to `account.txt` (JSON array format from EditThisCooki
 
 ---
 
+## ◈ Running the Bot
+
+### 1. Add your admin UID
+
+In `config.json`, add your Facebook UID to `adminBot` — this is the ID
+that can control the bot from chat (admin-only commands, `{prefix}setting`,
+no-prefix commands if enabled, etc.):
+
+```json
+"adminBot": [
+  "your_facebook_uid_here",
+  " ",
+  " "
+]
+```
+
+### 2. Add your session cookies
+
+Export your Facebook cookies (JSON array format, e.g. via the
+EditThisCookie browser extension) and paste them into `account.txt` at
+the project root. This is the login session the bot uses — without a
+valid `account.txt`, the bot can't log in.
+
+### 3. Deploy
+
+**Railway or a VPS** — both work fine:
+
+```bash
+npm install
+node index.js
+```
+
+On Railway, just connect the repo and it builds/runs the same way. On a
+VPS, run it directly or under a process manager (`pm2 start index.js`,
+`screen`, `tmux`, etc.) so it stays alive after you disconnect.
+
+**Render — does not work.** Render's platform is not compatible with how
+this bot runs (persistent MQTT/WebSocket connection + filesystem writes
+for session/appstate). Don't deploy this on Render — use Railway or a VPS
+instead.
+
+---
+
 ## ◈ Command Structure
 
 Commands go in `scripts/cmds/yourcommand.js`.
