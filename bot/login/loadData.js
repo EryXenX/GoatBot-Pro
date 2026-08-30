@@ -127,7 +127,7 @@ module.exports = async function (api, createLine) {
 
 	console.log(header("💻 SYSTEM READY"));
 
-	if (api && typeof api._connectE2EEAndMerge === "function") {
+	if (api && typeof api._connectE2EEAndMerge === "function" && global.GoatBot.config.e2ee?.enable !== false) {
 		await api._connectE2EEAndMerge();
 	}
 
