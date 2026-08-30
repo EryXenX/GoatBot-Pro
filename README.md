@@ -198,6 +198,7 @@ switch (event.logMessageType) {
   "prefix": "-",
   "adminBot": ["your_facebook_id"],
   "noPrefix": { "enable": false },
+  "e2ee": { "enable": true },
   "reactUnsend": {
     "enable": true,
     "onlyAdmin": true,
@@ -211,6 +212,30 @@ switch (event.logMessageType) {
     "autoReconnect": true
   }
 }
+```
+
+### E2EE (Encrypted Messaging)
+
+`config.e2ee.enable` controls whether the bot connects Facebook's E2EE
+(Signal Protocol encrypted threads) layer on startup.
+
+- `true` — E2EE connects on login. Needed if you want the bot to send/receive
+  in end-to-end encrypted threads. This runs a second, independent login to
+  Facebook using the same session, which carries extra account-flagging risk
+  (see below).
+- `false` — E2EE is skipped entirely, bot runs on the regular MQTT session
+  only. Safer against account flags/logouts; encrypted threads just won't
+  work with the bot.
+
+**Toggle it from chat** — `{prefix}setting` → **Connection (FCA / MQTT)**
+→ **E2EE**. This flips `config.e2ee.enable` and saves `config.json`
+automatically, but **needs a bot restart** to actually take effect (E2EE
+only connects once, at login).
+
+**Or edit `config.json` directly** and restart the bot:
+
+```json
+"e2ee": { "enable": false }
 ```
 
 ---
