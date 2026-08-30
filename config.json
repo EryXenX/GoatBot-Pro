@@ -21,6 +21,10 @@
     "enable": true,
     "notes": "true = only bot admins can use commands without prefix | false = everyone must use prefix"
   },
+  "e2ee": {
+    "enable": false,
+    "notes": "true = connect E2EE messaging layer on startup | false = skip E2EE entirely, MQTT only"
+  },
   "adminOnly": {
     "enable": false,
     "ignoreCommand": []
