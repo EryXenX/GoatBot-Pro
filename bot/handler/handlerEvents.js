@@ -219,19 +219,11 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 			} catch { }
 		}
 
-		// Typing indicator — off by default (config.enableTypingIndicator),
-		// since unlike markAsRead/markAsDelivered this one is visible and
-		// adds a real delay before the reply shows up. Only meaningful for
-		// actual chat messages, not reactions/other event types.
-		if (!event.isE2EE && event.type === "message" && global.GoatBot.config.enableTypingIndicator === true && typeof api.sendTypingIndicator === "function") {
-			try {
-				api.sendTypingIndicator(threadID, true).catch(() => {});
-				const typingDuration = Number(global.GoatBot.config.typingDuration) || 2000;
-				setTimeout(() => {
-					try { api.sendTypingIndicator(threadID, false).catch(() => {}); } catch { }
-				}, typingDuration);
-			} catch { }
-		}
+		// Typing indicator for plain chat is intentionally not shown here —
+		// only commands get a typing indicator, driven by fca's humanizer
+		// middleware for the exact reaction-delay window before this
+		// handler even runs. Showing typing on every ordinary message
+		// (like two friends chatting) doesn't read as natural.
 
 		const prefix = event.isE2EE ? config.prefix : getPrefix(threadID);
 		const role = getRole(threadData, senderID);
