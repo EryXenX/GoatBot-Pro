@@ -2,7 +2,218 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 
+const premium = (function () {
+  const API_BASE = "https://mirai-store.vercel.app";
+
+  let state = { adminUid: null, premiumUsers: [], premiumCommands: [], premiumAuthors: [] };
+  let _lastRefresh = 0;
+  const REFRESH_INTERVAL = 1000 * 60 * 5;
+  let _refreshing = null;
+
+  function normUid(uid) { return String(uid == null ? "" : uid).trim(); }
+  function normName(s) { return String(s == null ? "" : s).trim().toLowerCase(); }
+
+  function refresh(force = false) {
+    if (!force && Date.now() - _lastRefresh < REFRESH_INTERVAL) return Promise.resolve(state);
+    if (_refreshing) return _refreshing;
+    _refreshing = (async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/miraistore/premium`);
+        if (res.data && !res.data.error) {
+          state = {
+            adminUid: res.data.adminUid || state.adminUid || null,
+            premiumUsers: res.data.premiumUsers || [],
+            premiumCommands: res.data.premiumCommands || [],
+            premiumAuthors: res.data.premiumAuthors || []
+          };
+          _lastRefresh = Date.now();
+        }
+      } catch (_) {
+      } finally {
+        _refreshing = null;
+      }
+      return state;
+    })();
+    return _refreshing;
+  }
+
+  function isAdmin(senderId) { return !!state.adminUid && normUid(senderId) === state.adminUid; }
+
+  function isPremiumUser(senderId) { return state.premiumUsers.some(u => normUid(u) === normUid(senderId)); }
+
+  function isPremiumAuthor(author) { return state.premiumAuthors.some(a => normName(a) === normName(author)); }
+
+  function isPremiumCmd(cmdName, author) {
+    if (cmdName) {
+      if (state.premiumCommands.some(c => normName(c) === normName(cmdName))) return true;
+    }
+    return isPremiumAuthor(author);
+  }
+
+  function isPremiumViewer(senderId) { return isAdmin(senderId) || isPremiumUser(senderId); }
+
+  function isFiltered(cmdName, author, senderId) { return isPremiumCmd(cmdName, author) && !isPremiumViewer(senderId); }
+  function canExecutePremium(senderId) { return isAdmin(senderId) || isPremiumUser(senderId); }
+  function isAdminViewer(senderId) { return isAdmin(senderId); }
+
+  async function mutate(action, value, senderId) {
+    try {
+      const res = await axios.post(`${API_BASE}/miraistore/premium`, { senderId, action, value });
+      const data = res.data || {};
+      if (Array.isArray(data.premiumUsers)) {
+        state = {
+          adminUid: data.adminUid || state.adminUid || null,
+          premiumUsers: data.premiumUsers,
+          premiumCommands: data.premiumCommands || [],
+          premiumAuthors: data.premiumAuthors || []
+        };
+        _lastRefresh = Date.now();
+      }
+      if (data.error) return { ok: false, error: data.error };
+      return { ok: data.ok !== false };
+    } catch (e) {
+      return { ok: false, error: e.response?.data?.error || "Premium API error." };
+    }
+  }
+
+  async function addPremiumUser(uid, senderId) {
+    const u = normUid(uid);
+    if (!u) return { ok: false, error: "UID required" };
+    if (isAdmin(u)) return { ok: false, error: "Admin is already premium by default" };
+    return mutate("addUser", u, senderId);
+  }
+
+  async function removePremiumUser(uid, senderId) {
+    const u = normUid(uid);
+    if (!u) return { ok: false, error: "UID required" };
+    return mutate("removeUser", u, senderId);
+  }
+
+  async function addPremiumCmd(cmdName, senderId) {
+    const n = normName(cmdName);
+    if (!n) return { ok: false, error: "Command name required" };
+    return mutate("addCommand", n, senderId);
+  }
+
+  async function removePremiumCmd(cmdName, senderId) {
+    const n = normName(cmdName);
+    if (!n) return { ok: false, error: "Command name required" };
+    return mutate("removeCommand", n, senderId);
+  }
+
+  async function addPremiumAuthor(author, senderId) {
+    const a = normName(author);
+    if (!a) return { ok: false, error: "Author name required" };
+    return mutate("addAuthor", a, senderId);
+  }
+
+  async function removePremiumAuthor(author, senderId) {
+    const a = normName(author);
+    if (!a) return { ok: false, error: "Author name required" };
+    return mutate("removeAuthor", a, senderId);
+  }
+
+  function listPremium() {
+    return {
+      adminUid: state.adminUid,
+      premiumUsers: [...state.premiumUsers],
+      premiumCommands: [...state.premiumCommands],
+      premiumAuthors: [...state.premiumAuthors]
+    };
+  }
+
+  refresh(true);
+
+  return {
+    isAdmin,
+    isPremiumUser,
+    isPremiumAuthor,
+    isPremiumCmd,
+    isPremiumViewer,
+    canExecutePremium,
+    isFiltered,
+    isAdminViewer,
+    addPremiumUser,
+    removePremiumUser,
+    addPremiumCmd,
+    removePremiumCmd,
+    addPremiumAuthor,
+    removePremiumAuthor,
+    listPremium,
+    refresh
+  };
+})();
+
 const API_BASE = "https://mirai-store.vercel.app";
+
+const BOT_USER_AGENT = "MiraiStore-Bot/1.0 (+goatstore.js)";
+const botHttp = axios.create({ headers: { "User-Agent": BOT_USER_AGENT } });
+
+const FINGERPRINT_PATH = path.join(__dirname, "fingerprint.json");
+const FP_REFRESH_MS = 60 * 1000;
+let _botFingerprint = null;
+
+function loadFingerprintFile() {
+  try { return JSON.parse(fs.readFileSync(FINGERPRINT_PATH, "utf8")); }
+  catch { return null; }
+}
+
+function saveFingerprintFile(data) {
+  try { fs.writeFileSync(FINGERPRINT_PATH, JSON.stringify(data, null, 2)); }
+  catch (_) {}
+}
+
+async function refreshBotFingerprint() {
+  try {
+    const res = await botHttp.get(`${API_BASE}/miraistore/fingerprint`, { timeout: 6000 });
+    if (res.data?.fingerprint) {
+      _botFingerprint = res.data;
+      saveFingerprintFile(res.data);
+
+      if (res.data.uploadCap) {
+        console.log(`[goatstore-fp] this minute's upload cap: ${res.data.uploadCap}`);
+      }
+    }
+  } catch (err) {
+    console.error("[goatstore-fp] refresh failed:", err.message);
+  }
+}
+
+function getBotFingerprint() {
+
+  const now = Date.now();
+  if (_botFingerprint?.fingerprint && _botFingerprint.expiresAt > now) return _botFingerprint.fingerprint;
+  const cached = loadFingerprintFile();
+  if (cached?.fingerprint && cached.expiresAt > now) { _botFingerprint = cached; return cached.fingerprint; }
+  return null;
+}
+
+function addFp(url) {
+  const fp = getBotFingerprint();
+  if (!fp) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}botFingerprint=${encodeURIComponent(fp)}`;
+}
+
+async function checkAbuseGuard(senderID) {
+  try {
+    const res = await axios.get(`${API_BASE}/miraistore/ratelimit/status`, {
+      params: { clientFp: senderID },
+      timeout: 6000
+    });
+    return res.data || { blocked: false };
+  } catch (_) {
+    return { blocked: false };
+  }
+}
+
+function formatDuration(totalSeconds) {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${h}h ${m}m ${s}s`;
+}
+
 const userSeenNoti = new Map();
 const AUTOSYNC_CACHE_PATH = path.join(process.cwd(), "goatstore_sync_cache.json");
 const DIR_CACHE_PATH = path.join(process.cwd(), "goatstore_dircache.json");
@@ -10,10 +221,8 @@ const DIR_CACHE_PATH = path.join(process.cwd(), "goatstore_dircache.json");
 let _updateCheckCache = null;
 const UPDATE_CHECK_INTERVAL = 1000 * 60 * 30;
 
-// --- Pagination edit-limit ------------------------------------------------
 const MAX_EDITS_PER_MESSAGE = 5;
 
-// --- Prefix detection ---------------------------------------------------
 function getPrefix(threadData) {
   try {
     if (threadData?.data?.prefix) return threadData.data.prefix;
@@ -32,7 +241,6 @@ function saveSyncCache(cache) {
   catch (_) {}
 }
 
-// --- Autoupdate: always on, fully silent in the background ---------------
 let _autoupdateInFlight = false;
 
 function hashContent(content) {
@@ -41,7 +249,6 @@ function hashContent(content) {
   return h.toString(16);
 }
 
-// --- Shared version comparison -------------------------------------------
 function parseVer(v) {
   return String(v).split(".").map(n => parseInt(n) || 0);
 }
@@ -55,9 +262,6 @@ function cmpVer(a, b) {
   return 0;
 }
 
-// Scope config-field extraction to the actual config block (brace-depth
-// matched) — same approach as the backend's extractConfigBlock, so signals
-// aren't picked up from comments or unrelated objects elsewhere in the file.
 function extractConfigBlock(src) {
   const idx = src.search(/\bconfig\s*[:=]\s*\{/);
   if (idx === -1) return src;
@@ -77,18 +281,14 @@ function extractConfigBlock(src) {
 function detectFramework(code) {
   const configBlock = extractConfigBlock(code);
 
-  // Mirai — credits + hasPermission in config (matching the common
-  // "hasPermssion" typo as the backend does).
   const hasCredits    = /\bcredits\s*:/.test(configBlock);
   const hasPermission = /\bhasPerm(?:i)?ssion\s*[:(]/i.test(configBlock);
   if (hasCredits && hasPermission) return "mirai";
 
-  // GoatBot — author + role in config.
   const hasAuthor = /\bauthor\s*:/.test(configBlock);
   const hasRole   = /\brole\s*:/.test(configBlock);
   if (hasAuthor && hasRole) return "goat";
 
-  // Export-shape fallbacks.
   const isGoatStructure =
     /module\.exports\s*=\s*\{/.test(code) &&
     /onStart\s*[:(]|onChat\s*[:(]|onLoad\s*[:(]/.test(code);
@@ -99,18 +299,9 @@ function detectFramework(code) {
     /module\.exports\.run\s*=/.test(code);
   if (isMiraiStructure) return "mirai";
 
-  // No confident signal → "other" instead of the old blind "mirai" default.
   return "other";
 }
 
-
-// --- Auto-detect commands/events folders -----------------------------
-// goatstore.js itself is a command file, so it always lives INSIDE the
-// real commands folder alongside every other command — no need to guess
-// paths from cwd for that. __dirname IS the commands dir.
-// For the events dir, we look for a sibling folder (same parent as cmds)
-// whose name matches known event-folder patterns, since bots almost always
-// keep cmds/events side by side.
 const EVENTS_NAME_PATTERNS = ["events", "event"];
 const SCAN_SKIP_DIRS = new Set(["node_modules", ".git", ".cache", ".github", "dist", "build"]);
 
@@ -126,9 +317,6 @@ function saveDirCache(cache) {
 
 let _dirCache = loadDirCache();
 
-// Bounded breadth-first scan for a folder whose name matches one of the
-// given patterns, starting from `startDir` (used to find the events folder
-// as a sibling/nearby folder relative to where goatstore.js itself lives).
 function scanForDir(startDir, namePatterns, maxDepth = 2) {
   const queue = [{ dir: startDir, depth: 0 }];
   while (queue.length) {
@@ -150,8 +338,6 @@ function scanForDir(startDir, namePatterns, maxDepth = 2) {
 
 function getCmdsDir(forceRescan = false) {
   if (!forceRescan && _dirCache.cmdsDir && fs.existsSync(_dirCache.cmdsDir)) return _dirCache.cmdsDir;
-  // goatstore.js's own folder — it's a command file sitting right next to
-  // every other command, so this is always correct without guessing.
   const dir = __dirname;
   _dirCache.cmdsDir = dir;
   saveDirCache(_dirCache);
@@ -162,10 +348,6 @@ function getEventsDir(forceRescan = false) {
   if (!forceRescan && _dirCache.eventsDir && fs.existsSync(_dirCache.eventsDir)) return _dirCache.eventsDir;
   const cmdsDir = getCmdsDir(forceRescan);
   const parent = path.dirname(cmdsDir);
-  // Scan roots in priority order: the cmds folder's parent (events is almost
-  // always a sibling of cmds), one level higher, then the bot's cwd — the
-  // wider roots catch layouts like <root>/scripts/cmds with <root>/events,
-  // which a parent-only scan can never find.
   const roots = [...new Set([parent, path.dirname(parent), process.cwd()])];
   let dir = null;
   for (const root of roots) {
@@ -178,10 +360,6 @@ function getEventsDir(forceRescan = false) {
   return dir;
 }
 
-// Locate a file by name — commands look in the cmds dir first, then the
-// events dir (users mix them up); events only look in the events dir.
-// Returns the searched dirs too, so "not found" errors can say exactly
-// where we looked.
 function findLocalFile(fileName, kind) {
   const dirs = kind === "event" ? [getEventsDir()] : [getCmdsDir(), getEventsDir()];
   for (const dir of dirs) {
@@ -211,7 +389,7 @@ async function checkSelfUpdate() {
   if (_updateCheckCache && (now - _updateCheckCache.checkedAt) < UPDATE_CHECK_INTERVAL)
     return _updateCheckCache.result;
   try {
-    const res = await axios.get(`${API_BASE}/miraistore/search?q=goatstore&limit=10&framework=goat&kind=command`);
+    const res = await axios.get(addFp(`${API_BASE}/miraistore/search?q=goatstore&limit=10&framework=goat&kind=command`));
     const cmds = Array.isArray(res.data?.commands) ? res.data.commands : [];
     const match =
       cmds.find(c => c.name?.toLowerCase() === "goatstore" && c.author === module.exports.config.author) ||
@@ -231,18 +409,16 @@ async function checkSelfUpdate() {
   } catch (_) { return null; }
 }
 
-async function getTodayUpdates() {
+async function getTodayUpdates(senderID = null) {
   try {
-    const res = await axios.get(`${API_BASE}/miraistore/list?limit=50&framework=goat`);
+    const res = await axios.get(`${API_BASE}/miraistore/list?limit=50&framework=goat&clientFp=${encodeURIComponent(senderID || "")}`);
     const today = new Date().toDateString();
     return (res.data.commands || [])
-      .filter(cmd => new Date(cmd.uploadDate).toDateString() === today);
+      .filter(cmd => new Date(cmd.uploadDate).toDateString() === today)
+      .filter(cmd => premium.isPremiumViewer(senderID) || !premium.isPremiumCmd(cmd.name, cmd.author));
   } catch (_) { return []; }
 }
 
-// Global trending — every framework (Goat, Mirai, Other), each row
-// carries a type badge so the reader can tell which is which. Some
-// backends answer with a bare array, others wrap it in { commands }.
 async function getTrending(limit = 5) {
   const parse = d => Array.isArray(d) ? d : (Array.isArray(d?.commands) ? d.commands : null);
   try {
@@ -286,7 +462,7 @@ async function runAutoSync() {
                     || content.match(/credits\s*:\s*["'`](.*?)["'`]/)?.[1]
                     || "Unknown";
         const category = content.match(/category\s*:\s*["'`](.*?)["'`]/)?.[1] || "Uncategorized";
-        const res = await axios.post(`${API_BASE}/miraistore/upload`, { rawCode: content, framework: "goat", kind, author, category });
+        const res = await botHttp.post(`${API_BASE}/miraistore/upload`, { rawCode: content, framework: "goat", kind, author, category, botFingerprint: getBotFingerprint() });
         if (res.data?.error) {
           console.error(`[goatstore-sync] Upload skipped for ${file}: ${res.data.message || res.data.error}`);
         } else if (res.data?.updated) {
@@ -357,15 +533,17 @@ function autoloadCommand(filePath) {
   }
 }
 
-async function doInstall(api, threadID, id, forceKind = null) {
+async function doInstall(api, threadID, senderID, id, forceKind = null) {
   let cmdData = null;
   try {
-    const res = await axios.get(`${API_BASE}/miraistore/search?q=${encodeURIComponent(id)}`);
+    const res = await axios.get(addFp(`${API_BASE}/miraistore/search?q=${encodeURIComponent(id)}&clientFp=${encodeURIComponent(senderID || "")}`));
     const data = res.data;
     if (!isNaN(id) && data?.rawCode && !Array.isArray(data)) cmdData = data;
     else if (Array.isArray(data?.commands)) cmdData = data.commands.find(c => String(c.id) === String(id));
     if (!cmdData?.rawCode) return api.sendMessage("❌ Command not found or rawCode missing.", threadID);
-  } catch (_) { return api.sendMessage("❌ Failed to fetch command info.", threadID); }
+  } catch (err) {
+    return api.sendMessage(err.response?.data?.message || "❌ Failed to fetch command info.", threadID);
+  }
 
   if (cmdData.framework !== "goat")
     return api.sendMessage(
@@ -379,6 +557,7 @@ async function doInstall(api, threadID, id, forceKind = null) {
   try { new Function(cmdData.rawCode); }
   catch (err) { return api.sendMessage(`❌ Syntax error in remote code.\n${err.message}`, threadID); }
 
+  if (premium.isPremiumCmd(cmdData.name, cmdData.author)    && !premium.canExecutePremium(senderID, cmdData.name, cmdData.author))    return api.sendMessage("*This command is premium only*", threadID);
   const displayName = cmdData.name || `gs_${id}`;
   const isEvent = forceKind === "event" ? true : forceKind === "command" ? false : cmdData.kind === "event";
 
@@ -399,7 +578,7 @@ async function doInstall(api, threadID, id, forceKind = null) {
     return api.sendMessage(`❌ Failed to write file:\n${err.message}`, threadID);
   }
 
-  try { await axios.post(`${API_BASE}/miraistore/install/${cmdData.id}`); } catch (_) {}
+  try { await axios.post(`${API_BASE}/miraistore/install/${cmdData.id}`, { botFingerprint: getBotFingerprint(), clientFp: senderID }); } catch (_) {}
 
   const load = isEvent ? { success: false } : autoloadCommand(filePath);
 
@@ -426,7 +605,7 @@ async function doInstall(api, threadID, id, forceKind = null) {
 async function doSelfUpdateSilent(api, threadID, selfUpdate) {
   let cmdData = null;
   try {
-    const res = await axios.get(`${API_BASE}/miraistore/search?q=${encodeURIComponent(selfUpdate.latestId)}`);
+    const res = await axios.get(addFp(`${API_BASE}/miraistore/search?q=${encodeURIComponent(selfUpdate.latestId)}`));
     const data = res.data;
     if (!isNaN(selfUpdate.latestId) && data?.rawCode && !Array.isArray(data)) cmdData = data;
     else if (Array.isArray(data?.commands)) cmdData = data.commands.find(c => String(c.id) === String(selfUpdate.latestId));
@@ -440,7 +619,7 @@ async function doSelfUpdateSilent(api, threadID, selfUpdate) {
     fs.writeFileSync(__filename, cmdData.rawCode, "utf-8");
   } catch (_) { return false; }
 
-  try { await axios.post(`${API_BASE}/miraistore/install/${cmdData.id}`); } catch (_) {}
+  try { await axios.post(`${API_BASE}/miraistore/install/${cmdData.id}`, { botFingerprint: getBotFingerprint() }); } catch (_) {}
 
   const changelog = (cmdData.description || cmdData.changelog || "No changelog provided.").trim();
   const load = autoloadCommand(__filename);
@@ -476,17 +655,16 @@ function typeBadge(cmd) {
   return "📦 Other";
 }
 
-// "Author (v1.2)" — version shown right next to the author, used by both
-// search results and list pages.
 function authorLine(cmd) {
   const v = cmd.version && cmd.version !== "N/A" ? ` (v${cmd.version})` : "";
   return `${cmd.author || "Unknown"}${v}`;
 }
 
-// Result block — ID kept, Version on its own line below Author.
 function resultBlock(cmd) {
+  const isP = premium.isPremiumCmd(cmd.name, cmd.author);
+  const nameLine =isP ? `\u262F ${cmd.name}` : cmd.name;
   return (
-    `╭─‣ ${cmd.name} 〄\n` +
+    `╭─‣ ${nameLine} 〄\n` +
     `├‣ ID : ${cmd.id}\n` +
     `├‣ Type : ${typeBadge(cmd)}\n` +
     `├‣ Author : ${cmd.author || "Unknown"}\n` +
@@ -498,8 +676,10 @@ function resultBlock(cmd) {
 }
 
 function listBlock(cmd) {
+  const isP = premium.isPremiumCmd(cmd.name, cmd.author);
+  const nameLine =isP ? `\u262F ${cmd.name}` : cmd.name;
   return (
-    `╭─‣ ${cmd.name} 〄\n` +
+    `╭─‣ ${nameLine} 〄\n` +
     `├‣ ID : ${cmd.id}\n` +
     `├‣ Author : ${cmd.author || "Unknown"}\n` +
     `├‣ Version : ${cmd.version && cmd.version !== "N/A" ? ` ${cmd.version}` : " N/A"}\n` +
@@ -512,7 +692,7 @@ function listBlock(cmd) {
 async function sendListPage(api, threadID, senderID, kind, page, limit = 10, prefix = "!") {
   const offset = (page - 1) * limit;
   try {
-    const res = await axios.get(`${API_BASE}/miraistore/list?limit=${limit}&offset=${offset}&framework=goat&kind=${kind}`);
+    const res = await axios.get(`${API_BASE}/miraistore/list?limit=${limit}&offset=${offset}&framework=goat&kind=${kind}&clientFp=${encodeURIComponent(senderID || "")}`);
     const data = res.data;
     if (!Array.isArray(data.commands) || !data.commands.length)
       return api.sendMessage("❌ No results found for this page.", threadID);
@@ -520,7 +700,7 @@ async function sendListPage(api, threadID, senderID, kind, page, limit = 10, pre
     const totalPages = Math.ceil(data.total / limit);
     const label = kind === "event" ? "GoatBot Events" : "GoatBot Commands";
     let msg = `📂 ${label} — Page ${page}/${totalPages} (${data.total} total)\n\n`;
-    data.commands.forEach(cmd => { msg += listBlock(cmd); });
+        data.commands.forEach(cmd => { if (premium.isFiltered(cmd.name, cmd.author, senderID)) return; msg += listBlock(cmd); });
     if (totalPages > 1) msg += `⏤͟͟͞͞  Page ${page}/${totalPages}\n╭‣ React or reply p ${page + 1 <= totalPages ? page + 1 : page} for nxt pg\n`;
     msg += `╰‣ reply in <id> for install`;
 
@@ -534,10 +714,6 @@ async function sendListPage(api, threadID, senderID, kind, page, limit = 10, pre
   } catch (_) { api.sendMessage("❌ List API error.", threadID); }
 }
 
-// Universal search — no framework filter unless filterOpts.framework is
-// given, and can search by author instead of name via filterOpts.author.
-// Results come back from the backend already grouped goat → mirai → other,
-// most recent first within each group.
 function searchTitle(query, filterOpts) {
   if (filterOpts.author) return `👤 Author: ${filterOpts.author}`;
   if (filterOpts.category && !query) return `📂 Category: ${filterOpts.category}`;
@@ -555,8 +731,9 @@ async function sendSearchPage(api, threadID, senderID, query, page, limit = 5, p
     if (filterOpts.framework) url += `&framework=${filterOpts.framework}`;
     if (filterOpts.kind) url += `&kind=${filterOpts.kind}`;
     if (filterOpts.category) url += `&category=${encodeURIComponent(filterOpts.category)}`;
+    url += `&clientFp=${encodeURIComponent(senderID || "")}`;
 
-    const res = await axios.get(url);
+    const res = await axios.get(addFp(url));
     const data = res.data;
     if (!Array.isArray(data.commands) || !data.commands.length)
       return api.sendMessage(`❌ No results found${query ? ` for "${query}"` : ""}.`, threadID);
@@ -566,7 +743,7 @@ async function sendSearchPage(api, threadID, senderID, query, page, limit = 5, p
     const title = searchTitle(query, filterOpts);
 
     let msg = `${title} (${total} found)\n\n`;
-    data.commands.forEach(cmd => { msg += resultBlock(cmd); });
+    data.commands.forEach(cmd => { if (premium.isFiltered(cmd.name, cmd.author, senderID)) return; msg += resultBlock(cmd); });
     if (totalPages > 1) msg += `⏤͟͟͞͞  Page ${page}/${totalPages}\n╭‣ React or reply p ${page + 1 <= totalPages ? page + 1 : page} for nxt pg\n`;
     msg += `╰‣ reply in <id> for install`;
 
@@ -580,25 +757,27 @@ async function sendSearchPage(api, threadID, senderID, query, page, limit = 5, p
     };
     global.GoatBot.onReply.set(sent.messageID, h);
     if (totalPages > 1) global.GoatBot.onReaction.set(sent.messageID, h);
-  } catch (_) { api.sendMessage("❌ Search API error.", threadID); }
+  } catch (err) {
+    api.sendMessage(err.response?.data?.message || "❌ Search API error.", threadID);
+  }
 }
 
-async function renderListPageInto(messageID, kind, page, limit) {
+async function renderListPageInto(messageID, kind, page, limit, senderID = null) {
   const offset = (page - 1) * limit;
-  const res = await axios.get(`${API_BASE}/miraistore/list?limit=${limit}&offset=${offset}&framework=goat&kind=${kind}`);
+  const res = await axios.get(`${API_BASE}/miraistore/list?limit=${limit}&offset=${offset}&framework=goat&kind=${kind}&clientFp=${encodeURIComponent(senderID || "")}`);
   const data = res.data;
   if (!Array.isArray(data.commands) || !data.commands.length) return null;
 
   const totalPages = Math.ceil(data.total / limit);
   const label = kind === "event" ? "GoatBot Events" : "GoatBot Commands";
   let msg = `📂 ${label} — Page ${page}/${totalPages} (${data.total} total)\n\n`;
-  data.commands.forEach(cmd => { msg += listBlock(cmd); });
+  data.commands.forEach(cmd => { if (premium.isFiltered(cmd.name, cmd.author, senderID)) return; msg += listBlock(cmd); });
   if (totalPages > 1) msg += `⏤͟͟͞͞  Page ${page}/${totalPages}\n╭‣ React or reply p ${page + 1 <= totalPages ? page + 1 : page} for nxt pg\n`;
   msg += `╰‣ reply in <id> for install`;
   return { text: msg.trim(), totalPages };
 }
 
-async function renderSearchPageInto(query, page, limit, filterOpts = {}) {
+async function renderSearchPageInto(query, page, limit, filterOpts = {}, senderID = null) {
   const offset = (page - 1) * limit;
   let url = `${API_BASE}/miraistore/search?limit=${limit}&offset=${offset}`;
   if (filterOpts.author) url += `&author=${encodeURIComponent(filterOpts.author)}`;
@@ -606,8 +785,9 @@ async function renderSearchPageInto(query, page, limit, filterOpts = {}) {
   if (filterOpts.framework) url += `&framework=${filterOpts.framework}`;
   if (filterOpts.kind) url += `&kind=${filterOpts.kind}`;
   if (filterOpts.category) url += `&category=${encodeURIComponent(filterOpts.category)}`;
+  url += `&clientFp=${encodeURIComponent(senderID || "")}`;
 
-  const res = await axios.get(url);
+  const res = await axios.get(addFp(url));
   const data = res.data;
   if (!Array.isArray(data.commands) || !data.commands.length) return null;
 
@@ -616,7 +796,7 @@ async function renderSearchPageInto(query, page, limit, filterOpts = {}) {
   const title = searchTitle(query, filterOpts);
 
   let msg = `${title} (${total} found)\n\n`;
-  data.commands.forEach(cmd => { msg += resultBlock(cmd); });
+  data.commands.forEach(cmd => { if (premium.isFiltered(cmd.name, cmd.author, senderID)) return; msg += resultBlock(cmd); });
   if (totalPages > 1) msg += `⏤͟͟͞͞  Page ${page}/${totalPages}\n╭‣ React or reply p ${page + 1 <= totalPages ? page + 1 : page} for nxt pg\n`;
   msg += `╰‣ reply in <id> for install`;
   return { text: msg.trim(), totalPages };
@@ -644,11 +824,11 @@ async function uploadFile(api, threadID, filePath, kind, senderID = null) {
   try { pid = await animateUpload(api, threadID, displayName); } catch (_) {}
 
   try {
-    const body = { rawCode: data, framework: "goat", kind };
-    if (senderID) body.uploaderID = senderID;
-    const res = await axios.post(`${API_BASE}/miraistore/upload`, body);
+    const body = { rawCode: data, framework: "goat", kind, botFingerprint: getBotFingerprint() };
+    if (senderID) { body.uploaderID = senderID; body.clientFp = senderID; }
+    const res = await botHttp.post(`${API_BASE}/miraistore/upload`, body);
 
-    if (["Already exists", "Version already exists", "Version too low", "Not allowed"].includes(res.data?.error)) {
+    if (["Already exists", "Version already exists", "Version too low", "Not allowed", "Upload blocked"].includes(res.data?.error)) {
       if (pid) api.unsendMessage(pid);
       return api.sendMessage(
         `⚠️ Upload Blocked!\n` +
@@ -708,7 +888,7 @@ async function uploadFile(api, threadID, filePath, kind, senderID = null) {
       `⚠️ Store API Call Fail Korlo!\n` +
       `├‣ Error : ${err.response?.data?.error || err.message}\n` +
       `╰────────────◊\n` +
-      `💡 Request fail hoyeche, MiraiStore backend / network check koro.`,
+      `💡 ${err.response?.data?.message || "Request fail hoyeche, MiraiStore backend / network check koro."}`,
       threadID
     );
   }
@@ -718,10 +898,10 @@ module.exports = {
   config: {
     name: "goatstore",
     aliases: ["gs", "cmdstore", "commandstore"],
-    version: "19.4.0",
+    version: "19.6.1",
     author: "rX",
     countDown: 3,
-    role: 2,
+    role: 1,
     shortDescription: "GoatBot Store — Search, AutoUpdate, Install, Upload, AutoSync",
     longDescription: "Browse, install, upload, and autosync GoatBot commands and events from the MiraiStore API. Auto-detects your cmds/events folder naming. The bare-menu shows only the daily-use commands — every subcommand lives here in the guide.",
     category: "system",
@@ -743,6 +923,12 @@ module.exports = {
         "{pn} upload <fileName> — Upload a command file\n" +
         "{pn} sync — Manual sync\n" +
         "{pn} dirs — Show & re-detect cmds/events locations\n" +
+        "{pn} pr add <uid> — Add premium user (admin, or reply to a msg)\n" +
+        "{pn} pr remove <uid> — Remove premium user (admin)\n" +
+        "{pn} pr upload <cmdname> — Mark a command premium (admin)\n" +
+        "{pn} pr delete <cmdname> — Unmark a command (admin)\n" +
+        "{pn} pr author add|remove <authorname> — Premium by author (admin)\n" +
+        "{pn} pr list — Show premium state (admin)\n" +
         "Reply \"in\" to a single result — Install\n" +
         "Reply \"in <id>\" to a list result — Install"
     },
@@ -750,7 +936,12 @@ module.exports = {
   },
 
   onLoad: function () {
-    // Silent self-update, fully automatic — no subcommand needed.
+    refreshBotFingerprint().catch(() => {});
+    setInterval(() => { refreshBotFingerprint().catch(() => {}); }, FP_REFRESH_MS);
+    setTimeout(() => {
+      premium.refresh(true).catch(() => {});
+      setInterval(() => { premium.refresh(true).catch(() => {}); }, 1000 * 60 * 5);
+    }, 5000);
     setTimeout(() => {
       maybeAutoUpdate(null, null).catch(() => {});
       setInterval(() => { maybeAutoUpdate(null, null).catch(() => {}); }, UPDATE_CHECK_INTERVAL);
@@ -767,14 +958,11 @@ module.exports = {
   onReply: async function ({ api, event, Reply }) {
     const { threadID, body, senderID } = event;
 
-    // Reply-based install: "in <id>" installs a specific ID from a list;
-    // bare "in" installs the single-result ID stashed on the reply handler.
     const inIdMatch = body.match(/^in\s+(\d+)$/i);
     const inBareMatch = /^in$/i.test(body.trim());
-    if (inIdMatch) return doInstall(api, threadID, inIdMatch[1], null);
-    if (inBareMatch && Reply?.singleId) return doInstall(api, threadID, Reply.singleId, null);
+    if (inIdMatch) return doInstall(api, threadID, senderID, inIdMatch[1], null);
+    if (inBareMatch && Reply?.singleId) return doInstall(api, threadID, senderID, Reply.singleId, null);
 
-    // Reply-based delete: "rmv <id> [secret]" (legacy: "delete <id> [secret]").
     const delMatch = body.match(/^(?:rmv|delete|remove)\s+(\S+)(?:\s+(\S+))?/i);
     if (delMatch) {
       const [, delId, delSecret] = delMatch;
@@ -799,9 +987,6 @@ module.exports = {
     else await sendSearchPage(api, threadID, senderID, query, newPage, limit, prefix, { author: authorQuery, framework, kind, category });
   },
 
-  // Stateless reply install/delete — no onReply registration required.
-  // Fires on ANY reply to one of the bot's own store result messages
-  // (search/list/etc.), even after a bot restart wiped the onReply map.
   onChat: async function ({ api, event }) {
     const { threadID, senderID, body, messageReply } = event;
     if (!body || !messageReply) return;
@@ -811,15 +996,13 @@ module.exports = {
     const rmvMatch = text.match(/^(?:rmv|remove)\s+(\d+)(?:\s+(\S+))?$/i);
     if (!inMatch && !rmvMatch) return;
 
-    // Only act on replies to OUR OWN store result messages, so random chat
-    // replies like "in 5" never trigger an install/delete.
     let isBotMsg = false;
     try { isBotMsg = String(messageReply.senderID) === String(api.getCurrentUserID()); } catch (_) {}
     if (!isBotMsg) return;
     const repliedBody = messageReply.body || "";
     if (!/〄|🔍|📂|MiraiStore|GoatBot Store/i.test(repliedBody)) return;
 
-    if (inMatch) return doInstall(api, threadID, inMatch[1], null);
+    if (inMatch) return doInstall(api, threadID, senderID, inMatch[1], null);
 
     const [, id, secret] = rmvMatch;
     try {
@@ -841,8 +1024,8 @@ module.exports = {
 
     try {
       const rendered = mode === "list"
-        ? await renderListPageInto(messageID, listType, nextPage, limit)
-        : await renderSearchPageInto(query, nextPage, limit, { author: authorQuery, framework, kind, category });
+        ? await renderListPageInto(messageID, listType, nextPage, limit, senderID)
+        : await renderSearchPageInto(query, nextPage, limit, { author: authorQuery, framework, kind, category }, senderID);
 
       if (!rendered) return api.sendMessage("❌ No results found for this page.", threadID);
 
@@ -867,27 +1050,150 @@ module.exports = {
 
   onStart: async function ({ api, event, args, threadData }) {
     const { threadID, senderID } = event;
+
+    const guard = await checkAbuseGuard(senderID);
+    if (guard.blocked) {
+      return api.sendMessage(
+        `⚠️ Abnormal activity detected on your account.\n` +
+        `GoatStore access is suspended for ${formatDuration(guard.remainingSeconds || 0)}.`,
+        threadID
+      );
+    }
+
     const sub = args[0]?.toLowerCase() || null;
     const prefix = getPrefix(threadData || event?.threadData);
 
-    // Silent self-update also runs on every invocation (cheap, cached) as a
-    // backup to the background timer in onLoad — no subcommand, no chat noise.
+    if (sub === "pr" || sub === "premium") {
+      if (!premium.isAdmin(senderID)) return api.sendMessage("*store admin only cmd*", threadID);
+
+      const pSub = args[1]?.toLowerCase() || null;
+      const resolveUid = () => {
+        if (args[2]) return args[2];
+        if (event.messageReply?.senderID) return event.messageReply.senderID;
+
+        return null;
+      };
+
+      if (pSub === "add") {
+        const uid = resolveUid();
+        if (!uid) return api.sendMessage(`❌ Usage: ${prefix}gs pr add <uid> (or reply to a message)`, threadID);
+        const r = await premium.addPremiumUser(uid, senderID);
+        return api.sendMessage(r.ok ? `✅ Premium user added: ${uid}` : `❌ ${r.error}`, threadID);
+      }
+
+      if (pSub === "remove" || pSub === "rm") {
+        const uid = resolveUid();
+        if (!uid) return api.sendMessage(`❌ Usage: ${prefix}gs pr remove <uid> (or reply to a message)`, threadID);
+        const r = await premium.removePremiumUser(uid, senderID);
+        return api.sendMessage(r.ok ? `✅ Premium user removed: ${uid}` : `❌ ${r.error}`, threadID);
+      }
+
+      if (pSub === "upload") {
+        const cmdName = args.slice(2).join(" ");
+        if (!cmdName) return api.sendMessage(`❌ Usage: ${prefix}gs pr upload <cmdname>`, threadID);
+        const r = await premium.addPremiumCmd(cmdName, senderID);
+        return api.sendMessage(r.ok ? `✅ "${cmdName}" is now a premium command` : `❌ ${r.error}`, threadID);
+      }
+
+      if (pSub === "delete" || pSub === "del") {
+        const cmdName = args.slice(2).join(" ");
+        if (!cmdName) return api.sendMessage(`❌ Usage: ${prefix}gs pr delete <cmdname>`, threadID);
+        const r = await premium.removePremiumCmd(cmdName, senderID);
+        return api.sendMessage(r.ok ? `✅ Premium status removed from "${cmdName}"` : `❌ ${r.error}`, threadID);
+      }
+
+      if (pSub === "author") {
+        const aSub = args[2]?.toLowerCase() || null;
+        const authorName = args.slice(3).join(" ");
+        if (aSub === "add") {
+          if (!authorName) return api.sendMessage(`❌ Usage: ${prefix}gs pr author add <authorname>`, threadID);
+          const r = await premium.addPremiumAuthor(authorName, senderID);
+          return api.sendMessage(r.ok ? `✅ All commands by "${authorName}" are now premium` : `❌ ${r.error}`, threadID);
+        }
+        if (aSub === "remove" || aSub === "rm") {
+          if (!authorName) return api.sendMessage(`❌ Usage: ${prefix}gs pr author remove <authorname>`, threadID);
+          const r = await premium.removePremiumAuthor(authorName, senderID);
+          return api.sendMessage(r.ok ? `✅ Premium status removed from author "${authorName}"` : `❌ ${r.error}`, threadID);
+        }
+        return api.sendMessage(`❌ Usage: ${prefix}gs pr author add|remove <authorname>`, threadID);
+      }
+
+      if (pSub === "list" || pSub === "ls") {
+        const s = premium.listPremium();
+        const fmt = a => a.length ? a.map(x => `• ${x}`).join("\n") : "—";
+        return api.sendMessage(
+          `👑 Store Admin: ${s.adminUid}\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `👤 Premium Users:\n${fmt(s.premiumUsers)}\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `☯ Premium Commands:\n${fmt(s.premiumCommands)}\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `⛨ Premium Authors:\n${fmt(s.premiumAuthors)}`,
+          threadID
+        );
+      }
+
+      return api.sendMessage(
+        `📜 Premium Manager\n` +
+        `• ${prefix}gs pr add <uid> — add premium user (or reply to a message\n` +
+        `• ${prefix}gs pr remove <uid> — remove premium user\n` +
+        `• ${prefix}gs pr upload <cmdname> — mark a command premium\n` +
+        `• ${prefix}gs pr delete <cmdname> — unmark a command\n` +
+        `• ${prefix}gs pr author add|remove <authorname>\n` +
+        `• ${prefix}gs pr list — show premium state\n` +
+        `• ${prefix}gs transfer <cmdname> — shortcut: move a public store cmd to premium`,
+        threadID
+      );
+    }
+
+    if (sub === "transfer") {
+      if (!premium.isAdmin(senderID)) return api.sendMessage("*store admin only cmd*", threadID);
+
+      const cmdName = args.slice(1).join(" ").trim();
+      if (!cmdName) return api.sendMessage(`❌ Usage: ${prefix}gs transfer <cmdname>`, threadID);
+
+      let matched = null;
+      try {
+        const res = await axios.get(addFp(`${API_BASE}/miraistore/search?q=${encodeURIComponent(cmdName)}&kind=command&clientFp=${encodeURIComponent(senderID || "")}`));
+        const list = res.data?.commands || [];
+        const norm = s => String(s == null ? "" : s).trim().toLowerCase();
+        matched = list.find(c => norm(c.name) === norm(cmdName)) || null;
+      } catch (_) {
+      }
+
+      if (!matched) {
+        return api.sendMessage(
+          `⚠️ No public store command named "${cmdName}" found (exact match). ` +
+          `Marking it premium anyway — double-check the spelling.`,
+          threadID
+        );
+      }
+      if (premium.isPremiumCmd(matched.name, matched.author)) {
+        return api.sendMessage(`❌ "${matched.name}" is already premium.`, threadID);
+      }
+
+      const r = await premium.addPremiumCmd(matched.name, senderID);
+      return api.sendMessage(
+        r.ok
+          ? `✅ "${matched.name}" (by ${matched.author}) moved from public store to premium.`
+          : `❌ ${r.error}`,
+        threadID
+      );
+    }
+
     maybeAutoUpdate(api, threadID).catch(() => {});
 
     if (!sub) {
-      const updates = await getTodayUpdates();
+      const updates = await getTodayUpdates(senderID);
 
       if (updates.length && !userSeenNoti.get(senderID)) {
         let n = `🔔 [ NOTIFICATION ]\nToday ${updates.length} GoatBot update(s)!\n━━━━━━━━━━━━━━━━━━\n`;
-        updates.forEach(f => n += ` ‣ ${f.name} (ID: ${f.id})\n`);
+        updates.forEach(f => { if (premium.isFiltered(f.name, f.author, senderID)) return; n += ` ‣ ${f.name} (ID: ${f.id})\n`; });
         n += `\n(Type "${prefix}gs n" for details or "${prefix}gs" again for menu)`;
         userSeenNoti.set(senderID, true);
         return api.sendMessage(n, threadID);
       }
 
-      // Bare menu intentionally shows ONLY the daily-use commands;
-      // every other subcommand (-a, -c, -e, list, n, like, delete,
-      // dirs, ...) lives in the config guide instead of cluttering it.
       const menuMsg =
         `📦 GoatStore\n\nUsage:\n` +
         `• ${prefix}gs <id | file name> \n` +
@@ -900,13 +1206,13 @@ module.exports = {
     }
 
     if (sub === "n" || sub === "notification") {
-      const updates = await getTodayUpdates();
+      const updates = await getTodayUpdates(senderID);
       if (!updates.length)
         return api.sendMessage("📅 No GoatBot updates today.", threadID);
       let msg = `📂 Today's GoatBot Updates\n━━━━━━━━━━━━━━━━━━\n`;
-      updates.forEach(cmd =>
-        msg += `╭─‣ ${cmd.name}\n├‣ ID: ${cmd.id}\n├‣ Type: ${typeBadge(cmd)}\n├‣ Author: ${cmd.author}\n╰────────────◊\n\n`
-      );
+      updates.forEach(cmd => {
+        if (premium.isFiltered(cmd.name, cmd.author, senderID)) return;
+        msg += `╭─‣ ${cmd.name}\n├‣ ID: ${cmd.id}\n├‣ Type: ${typeBadge(cmd)}\n├‣ Author: ${cmd.author}\n╰────────────◊\n\n`;  });
       await api.sendMessage(msg.trim(), threadID);
       return;
     }
@@ -922,7 +1228,6 @@ module.exports = {
       return;
     }
 
-    // Show — and re-run — cmds/events folder auto-detection.
     if (sub === "dirs") {
       const cmdsDir = getCmdsDir(true);
       const eventsDir = getEventsDir(true);
@@ -949,7 +1254,7 @@ module.exports = {
       if (action === "install") {
         const id = args[2];
         if (!id) return api.sendMessage(`❌ Usage: ${prefix}gs -e install <id>`, threadID);
-        return doInstall(api, threadID, id, "event");
+        return doInstall(api, threadID, senderID, id, "event");
       }
 
       if (action === "upload") {
@@ -962,11 +1267,12 @@ module.exports = {
 
       if (!action) {
         try {
-          const res = await axios.get(`${API_BASE}/miraistore/list?limit=20&framework=goat&kind=event`);
+          const res = await axios.get(`${API_BASE}/miraistore/list?limit=20&framework=goat&kind=event&clientFp=${encodeURIComponent(senderID || "")}`);
           const events = res.data.commands || [];
           if (!events.length) return api.sendMessage("❌ No GoatBot events found in store.", threadID);
           let msg = `📂 GoatBot Store Events (${res.data.total})\n\n`;
           events.forEach(cmd => {
+            if (premium.isFiltered(cmd.name, cmd.author, senderID)) return;
             msg += `╭─‣ ${cmd.name}\n├‣ ID : ${cmd.id}\n├‣ Author : ${authorLine(cmd)}\n╰────────────◊\n\n`;
           });
           msg += `💡 Use: ${prefix}gs -e install <id>`;
@@ -976,11 +1282,12 @@ module.exports = {
       }
 
       try {
-        const res = await axios.get(`${API_BASE}/miraistore/search?q=${encodeURIComponent(action)}&limit=5&framework=goat&kind=event`);
+        const res = await axios.get(addFp(`${API_BASE}/miraistore/search?q=${encodeURIComponent(action)}&limit=5&framework=goat&kind=event&clientFp=${encodeURIComponent(senderID || "")}`));
         const events = res.data.commands || [];
         if (!events.length) return api.sendMessage(`❌ No GoatBot event found: "${action}"`, threadID);
         let msg = `📂 GoatBot Events matching "${action}"\n\n`;
         events.forEach(cmd => {
+          if (premium.isFiltered(cmd.name, cmd.author, senderID)) return;
           msg += `╭─‣ ${cmd.name}\n├‣ ID : ${cmd.id}\n├‣ Author : ${authorLine(cmd)}\n╰────────────◊\n\n`;
         });
         msg += `💡 Use: ${prefix}gs -e install <id>`;
@@ -992,14 +1299,14 @@ module.exports = {
     if (sub === "install") {
       const id = args[1];
       if (!id) return api.sendMessage(`❌ Usage: ${prefix}gs install <id>`, threadID);
-      return doInstall(api, threadID, id, null);
+      return doInstall(api, threadID, senderID, id, null);
     }
 
     if (sub === "like") {
       const id = args[1];
       if (!id) return api.sendMessage(`❌ Usage: ${prefix}gs like <id>`, threadID);
       try {
-        const res = await axios.post(`${API_BASE}/miraistore/like/${id}`, { userID: senderID });
+        const res = await axios.post(`${API_BASE}/miraistore/like/${id}`, { userID: senderID, clientFp: senderID });
         if (res.data?.message) return api.sendMessage("⚠️ Already liked.", threadID);
         return api.sendMessage(`❤️ Liked! Total Likes: ${res.data.likes}`, threadID);
       } catch (_) { return api.sendMessage("❌ Like API error.", threadID); }
@@ -1012,6 +1319,7 @@ module.exports = {
         if (!list.length) return api.sendMessage("❌ No trending files.", threadID);
         let msg = `🔥 Top Trending 🔥\n\n`;
         list.forEach((cmd, i) => {
+          if (premium.isFiltered(cmd.name, cmd.author, senderID)) return;
           msg +=
             `╭─‣ ${cmd.name}${i === 0 ? " 🏆" : ""}\n` +
             `├‣ Type : ${typeBadge(cmd)}\n` +
@@ -1026,8 +1334,6 @@ module.exports = {
     }
 
     if (sub === "upload") {
-      // Legacy "upload event <fileName>" still works; the documented
-      // form is "-e upload <fileName>".
       const isEvent = args[1]?.toLowerCase() === "event";
       const fileName = isEvent ? args[2] : args[1];
       const kind = isEvent ? "event" : "command";
@@ -1049,16 +1355,12 @@ module.exports = {
       } catch (_) { return api.sendMessage("❌ Delete API error.", threadID); }
     }
 
-    // Author search: "-a <name>" ("author" kept as an alias).
     if (sub === "-a" || sub === "--author" || sub === "author") {
       const authorName = args.slice(1).join(" ");
       if (!authorName) return api.sendMessage(`❌ Usage: ${prefix}gs -a <name>`, threadID);
       return sendSearchPage(api, threadID, senderID, "", 1, 5, prefix, { author: authorName });
     }
 
-    // Category search: "-c <goat|mirai|other>" browses a framework bucket;
-    // any other value matches the entry's category field ("cat" kept as
-    // an alias).
     if (sub === "-c" || sub === "--cat" || sub === "--category" || sub === "cat" || sub === "category") {
       const catName = args[1];
       if (!catName)
@@ -1069,30 +1371,34 @@ module.exports = {
       return sendSearchPage(api, threadID, senderID, rest, 1, 5, prefix, { category: catName });
     }
 
-    // Universal search — COMMANDS ONLY (kind=command); events live
-    // behind "-e". Matches by file name, falls back to matching by
-    // author. Append " -N" to the query to limit results.
     const query = args.join(" ");
     try {
-      const res = await axios.get(`${API_BASE}/miraistore/search?q=${encodeURIComponent(query)}&kind=command`);
+      const res = await axios.get(addFp(`${API_BASE}/miraistore/search?q=${encodeURIComponent(query)}&kind=command&clientFp=${encodeURIComponent(senderID || "")}`));
       const data = res.data;
       if (!data || data.message) return api.sendMessage("❌ Not found.", threadID);
 
       if (!isNaN(query) && !Array.isArray(data) && !data.commands) {
-        const finalMsg =
-          `${typeBadge(data)}\n` +
-          `╭─‣ Name : ${data.name}\n` +
-          `├‣ Author : ${data.author}\n` +
-          `├‣ Version : ${data.version || "N/A"}\n` +
-          `├‣ Category : ${data.category}\n` +
-          `├‣ Views : 👁️ ${data.views}\n` +
-          `├‣ Likes : ❤️ ${data.likes}\n` +
-          `├‣ Installs : ⬇️ ${data.installs}\n` +
-          `╰────────────◊\n` +
-          `⭔ Description: ${data.description || "No description"}\n` +
-          `⭔ Upload : ${new Date(data.uploadDate || Date.now()).toDateString()}\n` +
-          `🌐 URL : ${data.rawUrl}\n\n` +
-          `💬 Reply "in" to install`;
+        const isPrem = premium.isPremiumCmd(data.name, data.author);
+        if (isPrem && !premium.isPremiumViewer(senderID))
+          return api.sendMessage("*This command is premium only*", threadID);
+
+        const finalMsg = isPrem
+          ? resultBlock(data) + `💬 Reply "in" to install`
+          : (
+              `${typeBadge(data)}\n` +
+              `╭─‣ Name : ${data.name}\n` +
+              `├‣ Author : ${data.author}\n` +
+              `├‣ Version : ${data.version || "N/A"}\n` +
+              `├‣ Category : ${data.category}\n` +
+              `├‣ Views : 👁️ ${data.views}\n` +
+              `├‣ Likes : ❤️ ${data.likes}\n` +
+              `├‣ Installs : ⬇️ ${data.installs}\n` +
+              `╰────────────◊\n` +
+              `⭔ Description: ${data.description || "No description"}\n` +
+              `⭔ Upload : ${new Date(data.uploadDate || Date.now()).toDateString()}\n` +
+              `🌐 URL : ${data.rawUrl}\n\n` +
+              `💬 Reply "in" to install`
+            );
         const sent = await api.sendMessage(finalMsg, threadID);
         const h = { commandName: "goatstore", messageID: sent.messageID, singleId: data.id, mode: "single", senderID, editCount: 0 };
         global.GoatBot.onReply.set(sent.messageID, h);
@@ -1100,6 +1406,8 @@ module.exports = {
       }
 
       await sendSearchPage(api, threadID, senderID, query, 1, 5, prefix, { kind: "command" });
-    } catch (_) { return api.sendMessage("❌ Search API error.", threadID); }
+    } catch (err) {
+      return api.sendMessage(err.response?.data?.message || "❌ Search API error.", threadID);
+    }
   }
 };
