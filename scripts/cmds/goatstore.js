@@ -2,8 +2,44 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 
+// Store API base is loaded from remote JSON (not hardcoded).
+// Source: https://raw.githubusercontent.com/abdullahrx07/X-api/main/MaRiA/baseApiUrl.json
+const API_URL_JSON = "https://raw.githubusercontent.com/abdullahrx07/X-api/main/MaRiA/baseApiUrl.json";
+const API_FALLBACK = "https://mirai-store.vercel.app";
+// Optional hard override — lets a deployment point this bot file straight at
+// its own store (e.g. a Render URL) without editing the remote baseApiUrl.json.
+// Read lazily so dotenv config in the host bot has already run by the time
+// this file is required.
+function envOverride() {
+  const v = process.env.STORE_API_BASE;
+  return v && v.startsWith("http") ? v.replace(/\/$/, "") : null;
+}
+let _apiBase = null;
+let _apiBaseFetchedAt = 0;
+const API_BASE_TTL_MS = 5 * 60 * 1000; // re-fetch every 5 minutes
+
+async function getApiBase() {
+  const override = envOverride();
+  if (override) return override;
+  const now = Date.now();
+  if (_apiBase && now - _apiBaseFetchedAt < API_BASE_TTL_MS) return _apiBase;
+  try {
+    const res = await axios.get(API_URL_JSON, { timeout: 8000 });
+    const store = res.data && (res.data.store || res.data.Store);
+    if (store && typeof store === "string" && store.startsWith("http")) {
+      _apiBase = store.replace(/\/$/, "");
+      _apiBaseFetchedAt = now;
+      return _apiBase;
+    }
+  } catch (err) {
+    console.error("[goatstore] failed to fetch store API URL:", err.message);
+  }
+  if (!_apiBase) _apiBase = API_FALLBACK;
+  _apiBaseFetchedAt = now;
+  return _apiBase;
+}
+
 const premium = (function () {
-  const API_BASE = "https://mirai-store.vercel.app";
 
   let state = { adminUid: null, premiumUsers: [], premiumCommands: [], premiumAuthors: [] };
   let _lastRefresh = 0;
@@ -18,7 +54,7 @@ const premium = (function () {
     if (_refreshing) return _refreshing;
     _refreshing = (async () => {
       try {
-        const res = await axios.get(`${API_BASE}/miraistore/premium`);
+        const res = await axios.get(`${await getApiBase()}/miraistore/premium`);
         if (res.data && !res.data.error) {
           state = {
             adminUid: res.data.adminUid || state.adminUid || null,
@@ -58,7 +94,7 @@ const premium = (function () {
 
   async function mutate(action, value, senderId) {
     try {
-      const res = await axios.post(`${API_BASE}/miraistore/premium`, { senderId, action, value });
+      const res = await axios.post(`${await getApiBase()}/miraistore/premium`, { senderId, action, value });
       const data = res.data || {};
       if (Array.isArray(data.premiumUsers)) {
         state = {
@@ -144,60 +180,11 @@ const premium = (function () {
   };
 })();
 
-const API_BASE = "https://mirai-store.vercel.app";
-
-const BOT_USER_AGENT = "MiraiStore-Bot/1.0 (+goatstore.js)";
-const botHttp = axios.create({ headers: { "User-Agent": BOT_USER_AGENT } });
-
-const FINGERPRINT_PATH = path.join(__dirname, "fingerprint.json");
-const FP_REFRESH_MS = 60 * 1000;
-let _botFingerprint = null;
-
-function loadFingerprintFile() {
-  try { return JSON.parse(fs.readFileSync(FINGERPRINT_PATH, "utf8")); }
-  catch { return null; }
-}
-
-function saveFingerprintFile(data) {
-  try { fs.writeFileSync(FINGERPRINT_PATH, JSON.stringify(data, null, 2)); }
-  catch (_) {}
-}
-
-async function refreshBotFingerprint() {
-  try {
-    const res = await botHttp.get(`${API_BASE}/miraistore/fingerprint`, { timeout: 6000 });
-    if (res.data?.fingerprint) {
-      _botFingerprint = res.data;
-      saveFingerprintFile(res.data);
-
-      if (res.data.uploadCap) {
-        console.log(`[goatstore-fp] this minute's upload cap: ${res.data.uploadCap}`);
-      }
-    }
-  } catch (err) {
-    console.error("[goatstore-fp] refresh failed:", err.message);
-  }
-}
-
-function getBotFingerprint() {
-
-  const now = Date.now();
-  if (_botFingerprint?.fingerprint && _botFingerprint.expiresAt > now) return _botFingerprint.fingerprint;
-  const cached = loadFingerprintFile();
-  if (cached?.fingerprint && cached.expiresAt > now) { _botFingerprint = cached; return cached.fingerprint; }
-  return null;
-}
-
-function addFp(url) {
-  const fp = getBotFingerprint();
-  if (!fp) return url;
-  const sep = url.includes("?") ? "&" : "?";
-  return `${url}${sep}botFingerprint=${encodeURIComponent(fp)}`;
-}
+// Fingerprint system removed. API base is resolved via getApiBase().
 
 async function checkAbuseGuard(senderID) {
   try {
-    const res = await axios.get(`${API_BASE}/miraistore/ratelimit/status`, {
+    const res = await axios.get(`${await getApiBase()}/miraistore/ratelimit/status`, {
       params: { clientFp: senderID },
       timeout: 6000
     });
@@ -302,6 +289,7 @@ function detectFramework(code) {
   return "other";
 }
 
+
 const EVENTS_NAME_PATTERNS = ["events", "event"];
 const SCAN_SKIP_DIRS = new Set(["node_modules", ".git", ".cache", ".github", "dist", "build"]);
 
@@ -389,7 +377,7 @@ async function checkSelfUpdate() {
   if (_updateCheckCache && (now - _updateCheckCache.checkedAt) < UPDATE_CHECK_INTERVAL)
     return _updateCheckCache.result;
   try {
-    const res = await axios.get(addFp(`${API_BASE}/miraistore/search?q=goatstore&limit=10&framework=goat&kind=command`));
+    const res = await axios.get(`${await getApiBase()}/miraistore/search?q=goatstore&limit=10&framework=goat&kind=command`);
     const cmds = Array.isArray(res.data?.commands) ? res.data.commands : [];
     const match =
       cmds.find(c => c.name?.toLowerCase() === "goatstore" && c.author === module.exports.config.author) ||
@@ -411,7 +399,7 @@ async function checkSelfUpdate() {
 
 async function getTodayUpdates(senderID = null) {
   try {
-    const res = await axios.get(`${API_BASE}/miraistore/list?limit=50&framework=goat&clientFp=${encodeURIComponent(senderID || "")}`);
+    const res = await axios.get(`${await getApiBase()}/miraistore/list?limit=50&framework=goat&clientFp=${encodeURIComponent(senderID || "")}`);
     const today = new Date().toDateString();
     return (res.data.commands || [])
       .filter(cmd => new Date(cmd.uploadDate).toDateString() === today)
@@ -422,7 +410,7 @@ async function getTodayUpdates(senderID = null) {
 async function getTrending(limit = 5) {
   const parse = d => Array.isArray(d) ? d : (Array.isArray(d?.commands) ? d.commands : null);
   try {
-    const res = await axios.get(`${API_BASE}/miraistore/trending?limit=${limit}`);
+    const res = await axios.get(`${await getApiBase()}/miraistore/trending?limit=${limit}`);
     const list = parse(res.data);
     if (list) return list.slice(0, limit);
   } catch (_) {}
@@ -462,7 +450,7 @@ async function runAutoSync() {
                     || content.match(/credits\s*:\s*["'`](.*?)["'`]/)?.[1]
                     || "Unknown";
         const category = content.match(/category\s*:\s*["'`](.*?)["'`]/)?.[1] || "Uncategorized";
-        const res = await botHttp.post(`${API_BASE}/miraistore/upload`, { rawCode: content, framework: "goat", kind, author, category, botFingerprint: getBotFingerprint() });
+        const res = await axios.post(`${await getApiBase()}/miraistore/upload`, { rawCode: content, framework: "goat", kind, author, category });
         if (res.data?.error) {
           console.error(`[goatstore-sync] Upload skipped for ${file}: ${res.data.message || res.data.error}`);
         } else if (res.data?.updated) {
@@ -536,7 +524,7 @@ function autoloadCommand(filePath) {
 async function doInstall(api, threadID, senderID, id, forceKind = null) {
   let cmdData = null;
   try {
-    const res = await axios.get(addFp(`${API_BASE}/miraistore/search?q=${encodeURIComponent(id)}&clientFp=${encodeURIComponent(senderID || "")}`));
+    const res = await axios.get(`${await getApiBase()}/miraistore/search?q=${encodeURIComponent(id)}&clientFp=${encodeURIComponent(senderID || "")}`);
     const data = res.data;
     if (!isNaN(id) && data?.rawCode && !Array.isArray(data)) cmdData = data;
     else if (Array.isArray(data?.commands)) cmdData = data.commands.find(c => String(c.id) === String(id));
@@ -578,7 +566,7 @@ async function doInstall(api, threadID, senderID, id, forceKind = null) {
     return api.sendMessage(`❌ Failed to write file:\n${err.message}`, threadID);
   }
 
-  try { await axios.post(`${API_BASE}/miraistore/install/${cmdData.id}`, { botFingerprint: getBotFingerprint(), clientFp: senderID }); } catch (_) {}
+  try { await axios.post(`${await getApiBase()}/miraistore/install/${cmdData.id}`, { clientFp: senderID }); } catch (_) {}
 
   const load = isEvent ? { success: false } : autoloadCommand(filePath);
 
@@ -605,7 +593,7 @@ async function doInstall(api, threadID, senderID, id, forceKind = null) {
 async function doSelfUpdateSilent(api, threadID, selfUpdate) {
   let cmdData = null;
   try {
-    const res = await axios.get(addFp(`${API_BASE}/miraistore/search?q=${encodeURIComponent(selfUpdate.latestId)}`));
+    const res = await axios.get(`${await getApiBase()}/miraistore/search?q=${encodeURIComponent(selfUpdate.latestId)}`);
     const data = res.data;
     if (!isNaN(selfUpdate.latestId) && data?.rawCode && !Array.isArray(data)) cmdData = data;
     else if (Array.isArray(data?.commands)) cmdData = data.commands.find(c => String(c.id) === String(selfUpdate.latestId));
@@ -619,7 +607,7 @@ async function doSelfUpdateSilent(api, threadID, selfUpdate) {
     fs.writeFileSync(__filename, cmdData.rawCode, "utf-8");
   } catch (_) { return false; }
 
-  try { await axios.post(`${API_BASE}/miraistore/install/${cmdData.id}`, { botFingerprint: getBotFingerprint() }); } catch (_) {}
+  try { await axios.post(`${await getApiBase()}/miraistore/install/${cmdData.id}`, { }); } catch (_) {}
 
   const changelog = (cmdData.description || cmdData.changelog || "No changelog provided.").trim();
   const load = autoloadCommand(__filename);
@@ -692,7 +680,7 @@ function listBlock(cmd) {
 async function sendListPage(api, threadID, senderID, kind, page, limit = 10, prefix = "!") {
   const offset = (page - 1) * limit;
   try {
-    const res = await axios.get(`${API_BASE}/miraistore/list?limit=${limit}&offset=${offset}&framework=goat&kind=${kind}&clientFp=${encodeURIComponent(senderID || "")}`);
+    const res = await axios.get(`${await getApiBase()}/miraistore/list?limit=${limit}&offset=${offset}&framework=goat&kind=${kind}&clientFp=${encodeURIComponent(senderID || "")}`);
     const data = res.data;
     if (!Array.isArray(data.commands) || !data.commands.length)
       return api.sendMessage("❌ No results found for this page.", threadID);
@@ -725,7 +713,7 @@ function searchTitle(query, filterOpts) {
 async function sendSearchPage(api, threadID, senderID, query, page, limit = 5, prefix = "!", filterOpts = {}) {
   const offset = (page - 1) * limit;
   try {
-    let url = `${API_BASE}/miraistore/search?limit=${limit}&offset=${offset}`;
+    let url = `${await getApiBase()}/miraistore/search?limit=${limit}&offset=${offset}`;
     if (filterOpts.author) url += `&author=${encodeURIComponent(filterOpts.author)}`;
     else url += `&q=${encodeURIComponent(query || "")}`;
     if (filterOpts.framework) url += `&framework=${filterOpts.framework}`;
@@ -733,7 +721,7 @@ async function sendSearchPage(api, threadID, senderID, query, page, limit = 5, p
     if (filterOpts.category) url += `&category=${encodeURIComponent(filterOpts.category)}`;
     url += `&clientFp=${encodeURIComponent(senderID || "")}`;
 
-    const res = await axios.get(addFp(url));
+    const res = await axios.get(url);
     const data = res.data;
     if (!Array.isArray(data.commands) || !data.commands.length)
       return api.sendMessage(`❌ No results found${query ? ` for "${query}"` : ""}.`, threadID);
@@ -764,7 +752,7 @@ async function sendSearchPage(api, threadID, senderID, query, page, limit = 5, p
 
 async function renderListPageInto(messageID, kind, page, limit, senderID = null) {
   const offset = (page - 1) * limit;
-  const res = await axios.get(`${API_BASE}/miraistore/list?limit=${limit}&offset=${offset}&framework=goat&kind=${kind}&clientFp=${encodeURIComponent(senderID || "")}`);
+  const res = await axios.get(`${await getApiBase()}/miraistore/list?limit=${limit}&offset=${offset}&framework=goat&kind=${kind}&clientFp=${encodeURIComponent(senderID || "")}`);
   const data = res.data;
   if (!Array.isArray(data.commands) || !data.commands.length) return null;
 
@@ -779,7 +767,7 @@ async function renderListPageInto(messageID, kind, page, limit, senderID = null)
 
 async function renderSearchPageInto(query, page, limit, filterOpts = {}, senderID = null) {
   const offset = (page - 1) * limit;
-  let url = `${API_BASE}/miraistore/search?limit=${limit}&offset=${offset}`;
+  let url = `${await getApiBase()}/miraistore/search?limit=${limit}&offset=${offset}`;
   if (filterOpts.author) url += `&author=${encodeURIComponent(filterOpts.author)}`;
   else url += `&q=${encodeURIComponent(query || "")}`;
   if (filterOpts.framework) url += `&framework=${filterOpts.framework}`;
@@ -787,7 +775,7 @@ async function renderSearchPageInto(query, page, limit, filterOpts = {}, senderI
   if (filterOpts.category) url += `&category=${encodeURIComponent(filterOpts.category)}`;
   url += `&clientFp=${encodeURIComponent(senderID || "")}`;
 
-  const res = await axios.get(addFp(url));
+  const res = await axios.get(url);
   const data = res.data;
   if (!Array.isArray(data.commands) || !data.commands.length) return null;
 
@@ -824,9 +812,9 @@ async function uploadFile(api, threadID, filePath, kind, senderID = null) {
   try { pid = await animateUpload(api, threadID, displayName); } catch (_) {}
 
   try {
-    const body = { rawCode: data, framework: "goat", kind, botFingerprint: getBotFingerprint() };
+    const body = { rawCode: data, framework: "goat", kind };
     if (senderID) { body.uploaderID = senderID; body.clientFp = senderID; }
-    const res = await botHttp.post(`${API_BASE}/miraistore/upload`, body);
+    const res = await axios.post(`${await getApiBase()}/miraistore/upload`, body);
 
     if (["Already exists", "Version already exists", "Version too low", "Not allowed", "Upload blocked"].includes(res.data?.error)) {
       if (pid) api.unsendMessage(pid);
@@ -898,10 +886,10 @@ module.exports = {
   config: {
     name: "goatstore",
     aliases: ["gs", "cmdstore", "commandstore"],
-    version: "19.6.1",
+    version: "19.8.0",
     author: "rX",
     countDown: 3,
-    role: 1,
+    role: 2,
     shortDescription: "GoatBot Store — Search, AutoUpdate, Install, Upload, AutoSync",
     longDescription: "Browse, install, upload, and autosync GoatBot commands and events from the MiraiStore API. Auto-detects your cmds/events folder naming. The bare-menu shows only the daily-use commands — every subcommand lives here in the guide.",
     category: "system",
@@ -936,8 +924,6 @@ module.exports = {
   },
 
   onLoad: function () {
-    refreshBotFingerprint().catch(() => {});
-    setInterval(() => { refreshBotFingerprint().catch(() => {}); }, FP_REFRESH_MS);
     setTimeout(() => {
       premium.refresh(true).catch(() => {});
       setInterval(() => { premium.refresh(true).catch(() => {}); }, 1000 * 60 * 5);
@@ -968,7 +954,7 @@ module.exports = {
       const [, delId, delSecret] = delMatch;
       try {
         const payload = delSecret ? { secret: delSecret, userID: senderID } : { userID: senderID };
-        const res = await axios.post(`${API_BASE}/miraistore/delete/${delId}`, payload);
+        const res = await axios.post(`${await getApiBase()}/miraistore/delete/${delId}`, payload);
         if (res.data?.error) return api.sendMessage(`❌ ${res.data.error}`, threadID);
         return api.sendMessage(`🗑️ Deleted! ID: ${delId}`, threadID);
       } catch (_) { return api.sendMessage("❌ Delete API error.", threadID); }
@@ -1007,7 +993,7 @@ module.exports = {
     const [, id, secret] = rmvMatch;
     try {
       const payload = secret ? { secret, userID: senderID } : { userID: senderID };
-      const res = await axios.post(`${API_BASE}/miraistore/delete/${id}`, payload);
+      const res = await axios.post(`${await getApiBase()}/miraistore/delete/${id}`, payload);
       if (res.data?.error) return api.sendMessage(`❌ ${res.data.error}`, threadID);
       return api.sendMessage(`🗑️ Deleted! ID: ${id}`, threadID);
     } catch (_) { return api.sendMessage("❌ Delete API error.", threadID); }
@@ -1063,6 +1049,8 @@ module.exports = {
     const sub = args[0]?.toLowerCase() || null;
     const prefix = getPrefix(threadData || event?.threadData);
 
+
+
     if (sub === "pr" || sub === "premium") {
       if (!premium.isAdmin(senderID)) return api.sendMessage("*store admin only cmd*", threadID);
 
@@ -1070,6 +1058,8 @@ module.exports = {
       const resolveUid = () => {
         if (args[2]) return args[2];
         if (event.messageReply?.senderID) return event.messageReply.senderID;
+
+
 
         return null;
       };
@@ -1135,13 +1125,13 @@ module.exports = {
 
       return api.sendMessage(
         `📜 Premium Manager\n` +
-        `• ${prefix}gs pr add <uid> — add premium user (or reply to a message\n` +
-        `• ${prefix}gs pr remove <uid> — remove premium user\n` +
-        `• ${prefix}gs pr upload <cmdname> — mark a command premium\n` +
-        `• ${prefix}gs pr delete <cmdname> — unmark a command\n` +
+        `• ${prefix}gs pr add <uid>\n` +
+        `• ${prefix}gs pr remove <uid>\n` +
+        `• ${prefix}gs pr upload <cmdname>\n` +
+        `• ${prefix}gs pr delete <cmdname>\n` +
         `• ${prefix}gs pr author add|remove <authorname>\n` +
         `• ${prefix}gs pr list — show premium state\n` +
-        `• ${prefix}gs transfer <cmdname> — shortcut: move a public store cmd to premium`,
+        `• ${prefix}gs transfer <cmdname>`,
         threadID
       );
     }
@@ -1154,7 +1144,7 @@ module.exports = {
 
       let matched = null;
       try {
-        const res = await axios.get(addFp(`${API_BASE}/miraistore/search?q=${encodeURIComponent(cmdName)}&kind=command&clientFp=${encodeURIComponent(senderID || "")}`));
+        const res = await axios.get(`${await getApiBase()}/miraistore/search?q=${encodeURIComponent(cmdName)}&kind=command&clientFp=${encodeURIComponent(senderID || "")}`);
         const list = res.data?.commands || [];
         const norm = s => String(s == null ? "" : s).trim().toLowerCase();
         matched = list.find(c => norm(c.name) === norm(cmdName)) || null;
@@ -1180,6 +1170,7 @@ module.exports = {
         threadID
       );
     }
+
 
     maybeAutoUpdate(api, threadID).catch(() => {});
 
@@ -1267,7 +1258,7 @@ module.exports = {
 
       if (!action) {
         try {
-          const res = await axios.get(`${API_BASE}/miraistore/list?limit=20&framework=goat&kind=event&clientFp=${encodeURIComponent(senderID || "")}`);
+          const res = await axios.get(`${await getApiBase()}/miraistore/list?limit=20&framework=goat&kind=event&clientFp=${encodeURIComponent(senderID || "")}`);
           const events = res.data.commands || [];
           if (!events.length) return api.sendMessage("❌ No GoatBot events found in store.", threadID);
           let msg = `📂 GoatBot Store Events (${res.data.total})\n\n`;
@@ -1282,7 +1273,7 @@ module.exports = {
       }
 
       try {
-        const res = await axios.get(addFp(`${API_BASE}/miraistore/search?q=${encodeURIComponent(action)}&limit=5&framework=goat&kind=event&clientFp=${encodeURIComponent(senderID || "")}`));
+        const res = await axios.get(`${await getApiBase()}/miraistore/search?q=${encodeURIComponent(action)}&limit=5&framework=goat&kind=event&clientFp=${encodeURIComponent(senderID || "")}`);
         const events = res.data.commands || [];
         if (!events.length) return api.sendMessage(`❌ No GoatBot event found: "${action}"`, threadID);
         let msg = `📂 GoatBot Events matching "${action}"\n\n`;
@@ -1306,7 +1297,7 @@ module.exports = {
       const id = args[1];
       if (!id) return api.sendMessage(`❌ Usage: ${prefix}gs like <id>`, threadID);
       try {
-        const res = await axios.post(`${API_BASE}/miraistore/like/${id}`, { userID: senderID, clientFp: senderID });
+        const res = await axios.post(`${await getApiBase()}/miraistore/like/${id}`, { userID: senderID, clientFp: senderID });
         if (res.data?.message) return api.sendMessage("⚠️ Already liked.", threadID);
         return api.sendMessage(`❤️ Liked! Total Likes: ${res.data.likes}`, threadID);
       } catch (_) { return api.sendMessage("❌ Like API error.", threadID); }
@@ -1349,7 +1340,7 @@ module.exports = {
       if (!id) return api.sendMessage(`❌ Usage: ${prefix}gs delete <id> [secret]`, threadID);
       try {
         const payload = secret ? { secret, userID: senderID } : { userID: senderID };
-        const res = await axios.post(`${API_BASE}/miraistore/delete/${id}`, payload);
+        const res = await axios.post(`${await getApiBase()}/miraistore/delete/${id}`, payload);
         if (res.data?.error) return api.sendMessage(`❌ ${res.data.error}`, threadID);
         return api.sendMessage(`🗑️ Deleted! ID: ${id}`, threadID);
       } catch (_) { return api.sendMessage("❌ Delete API error.", threadID); }
@@ -1373,7 +1364,7 @@ module.exports = {
 
     const query = args.join(" ");
     try {
-      const res = await axios.get(addFp(`${API_BASE}/miraistore/search?q=${encodeURIComponent(query)}&kind=command&clientFp=${encodeURIComponent(senderID || "")}`));
+      const res = await axios.get(`${await getApiBase()}/miraistore/search?q=${encodeURIComponent(query)}&kind=command&clientFp=${encodeURIComponent(senderID || "")}`);
       const data = res.data;
       if (!data || data.message) return api.sendMessage("❌ Not found.", threadID);
 
