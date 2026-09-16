@@ -5,12 +5,12 @@ const path = require("path");
 module.exports = {
   config: {
     name: "edit",
-    aliases: ["qwen"],
-    version: "3.0.0",
+    aliases: [],
+    version: "4.0.0",
     author: "EryXenX",
     countDown: 30,
     role: 0,
-    shortDescription: "Edit image using Qwen API",
+    shortDescription: "Edit image using AI",
     category: "AI",
     guide: "{pn} <text> (reply to an image) | {pn} -a <text> (reply to an image, then reply to the bot's message with a 2nd photo)"
   },
@@ -24,7 +24,7 @@ module.exports = {
     if (!prompt) {
       return api.sendMessage(
         addMode
-          ? "⚠️ Usage: qwen -a <text> (reply to an image)"
+          ? "⚠️ Usage: edit -a <text> (reply to an image)"
           : "⚠️ Please provide some text for the image.",
         threadID,
         messageID
@@ -44,7 +44,7 @@ module.exports = {
     api.setMessageReaction("🫩", messageID, () => {}, true);
 
     api.sendMessage(
-      "📷 𝐀𝐝𝐝 𝐚𝐧𝐨𝐭𝐡𝐞𝐫 𝐩𝐡𝐨𝐭𝐨 — reply to this message with the 2nd image.",
+      "📷 Send another photo\nReply to this message with your 2nd image.",
       threadID,
       (err, info) => {
         if (err || !info) {
@@ -90,7 +90,7 @@ module.exports = {
   }
 };
 
-const API_BASE = "https://qwen-xdi.onrender.com/edit";
+const API_BASE = "https://eryxenx.agi.bd/api/imgedit";
 
 async function runEditRequest({ api, event, prompt, imageUrls, reactionMsgID }) {
   try {
@@ -106,7 +106,7 @@ async function runEditRequest({ api, event, prompt, imageUrls, reactionMsgID }) 
     if (!finalImageURL) {
       const errMsg = (data && (data.error || data.message)) || "Unknown reason";
       api.setMessageReaction("⚠️", reactionMsgID, () => {}, true);
-      return api.sendMessage(`❌ API Error: ${errMsg}`, event.threadID, event.messageID);
+      return api.sendMessage(`❌ Failed to edit\nReason: ${errMsg}`, event.threadID, event.messageID);
     }
 
     const cacheDir = path.join(__dirname, "cache");
@@ -117,23 +117,25 @@ async function runEditRequest({ api, event, prompt, imageUrls, reactionMsgID }) 
       timeout: 60000
     });
 
-    const ext = finalImageURL.split("?")[0].split(".").pop().toLowerCase();
+    const contentType = data.contentType || "";
+    const extFromType = contentType.split("/").pop();
+    const ext = (extFromType || finalImageURL.split("?")[0].split(".").pop() || "png").toLowerCase();
     const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "png";
     const filePath = path.join(cacheDir, `${Date.now()}.${safeExt}`);
     fs.writeFileSync(filePath, Buffer.from(imageResponse.data));
 
-    api.setMessageReaction("🧃", reactionMsgID, () => {}, true);
+    api.setMessageReaction("✅", reactionMsgID, () => {}, true);
     api.sendMessage(
       {
-        body: "> 🎀 𝐃𝐨𝐧𝐞",
+        body: "✅ Edit complete",
         attachment: fs.createReadStream(filePath)
       },
       event.threadID,
       () => fs.unlinkSync(filePath)
     );
   } catch (err) {
-    console.error("QWEN EDIT Error:", err?.response?.data || err.message);
+    console.error("EDIT Error:", err?.response?.data || err.message);
     api.setMessageReaction("❌", reactionMsgID, () => {}, true);
-    api.sendMessage("❌ Error while processing the image.", event.threadID, event.messageID);
+    api.sendMessage("❌ Failed to edit\nReason: unexpected error", event.threadID, event.messageID);
   }
 }
