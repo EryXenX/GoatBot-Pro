@@ -19,11 +19,18 @@ module.exports = {
   },
 
   onStart: async function ({ api, event, args, message }) {
-    if (!args[0]) {
-      return message.reply("No URL provided!\n\nExample: !webss eryxenx.agi.bd");
+    let url = args[0]?.trim();
+
+    if (!url && event.messageReply?.body) {
+      const match = event.messageReply.body.match(/https?:\/\/[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*/);
+      if (match) url = match[0];
     }
 
-    let url = args[0].trim();
+    if (!url) {
+      return message.reply("No URL provided!\n\nExample: !webss eryxenx.agi.bd\nOr reply to a message containing a link with !webss");
+    }
+
+    url = url.trim();
 
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       url = "https://" + url;
