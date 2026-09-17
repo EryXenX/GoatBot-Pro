@@ -12,7 +12,7 @@
 ![Node](https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
 ![Base](https://img.shields.io/badge/Based_on-Goat_Bot_V2-FF6B6B?style=for-the-badge&logo=github&logoColor=white)
 ![Fork](https://img.shields.io/badge/Fork_by-EryXenX-6E40C9?style=for-the-badge&logo=github&logoColor=white)
-![FCA](https://img.shields.io/badge/FCA-fca--eryxenx-0E7C86?style=for-the-badge&logoColor=white)
+![FCA](https://img.shields.io/badge/FCA-%40eryxenx%2Ffca-0E7C86?style=for-the-badge&logoColor=white)
 
 </div>
 
