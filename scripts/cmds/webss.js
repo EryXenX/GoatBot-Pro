@@ -6,7 +6,7 @@ module.exports = {
   config: {
     name: "webss",
     aliases: ["screenshot", "ss"],
-    version: "1.1",
+    version: "3.0.0",
     author: "EryXenX",
     countDown: 10,
     role: 2,
@@ -14,13 +14,13 @@ module.exports = {
     longDescription: "Take a screenshot of any website",
     category: "utility",
     guide: {
-      en: "{p}webss <url>\nExample: {p}webss mariasmm.shop",
+      en: "{p}webss <url>\nExample: {p}webss eryxenx.agi.bd",
     },
   },
 
   onStart: async function ({ api, event, args, message }) {
     if (!args[0]) {
-      return message.reply("No URL provided!\n\nExample: !webss mariasmm.shop");
+      return message.reply("No URL provided!\n\nExample: !webss eryxenx.agi.bd");
     }
 
     let url = args[0].trim();
@@ -32,7 +32,7 @@ module.exports = {
     try {
       new URL(url);
     } catch {
-      return message.reply("Invalid URL!\nExample: !webss mariasmm.shop");
+      return message.reply("Invalid URL!\nExample: !webss eryxenx.agi.bd");
     }
 
     const { messageID } = event;
@@ -43,29 +43,14 @@ module.exports = {
 
     try {
       const encodedUrl = encodeURIComponent(url);
-      const apiUrl = `https://s.wordpress.com/mshots/v1/${encodedUrl}?w=1280&h=800`;
+      const apiUrl = `https://eryxenx.agi.bd/api/screenshot?url=${encodedUrl}`;
 
-      let imageBuffer;
-      const maxAttempts = 5;
+      const response = await axios.get(apiUrl, {
+        responseType: "arraybuffer",
+        timeout: 60000,
+      });
 
-      for (let i = 0; i < maxAttempts; i++) {
-        const response = await axios.get(apiUrl, {
-          responseType: "arraybuffer",
-          timeout: 30000,
-        });
-
-        const buffer = Buffer.from(response.data);
-        const isGif = buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46;
-
-        if (!isGif && buffer.length > 5000) {
-          imageBuffer = buffer;
-          break;
-        }
-
-        await new Promise((r) => setTimeout(r, 4000));
-      }
-
-      if (!imageBuffer) throw new Error("Screenshot not ready, try again later");
+      const imageBuffer = Buffer.from(response.data);
 
       await fs.outputFile(screenshotPath, imageBuffer);
       await api.setMessageReaction("✅", messageID, () => {}, true);
