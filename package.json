@@ -1,7 +1,7 @@
 {
-        "name": "goat-bot-v2",
-        "version": "2.0.0",
-        "description": "A simple Bot chat messenger using personal account. Made by NTKhang.",
+        "name": "goatbot-pro",
+        "version": "7.0.0",
+        "description": "Enhanced Facebook Messenger bot framework, forked and modified by EryXenX from Goat Bot V2 (originally by NTKhang).",
         "main": "index.js",
         "engines": {
                 "node": "18.x",
