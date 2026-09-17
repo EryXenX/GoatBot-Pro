@@ -8,7 +8,7 @@
 
 <br/>
 
-![Version](https://img.shields.io/badge/Version-2.0.0-0E7C86?style=for-the-badge&logo=github&logoColor=white)
+![Version](https://img.shields.io/badge/Version-7.0.0-0E7C86?style=for-the-badge&logo=github&logoColor=white)
 ![Node](https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
 ![Base](https://img.shields.io/badge/Based_on-Goat_Bot_V2-FF6B6B?style=for-the-badge&logo=github&logoColor=white)
 ![Fork](https://img.shields.io/badge/Fork_by-EryXenX-6E40C9?style=for-the-badge&logo=github&logoColor=white)
