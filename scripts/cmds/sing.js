@@ -4,16 +4,16 @@ const fs = require("fs");
 const path = require("path");
 
 const CACHE_DIR = path.join(__dirname, "cache");
-const DL_API_BASE = "https://ytdl-api-xdi.onrender.com/api/dl";
+const SONG_API_BASE = "https://eryxenx.agi.bd/api/song";
 
 async function fetchSongInfo(videoUrl) {
-	const infoRes = await axios.get(DL_API_BASE, {
-		params: { link: videoUrl, format: "mp3" },
+	const infoRes = await axios.get(SONG_API_BASE, {
+		params: { url: videoUrl },
 		timeout: 60000
 	});
 
 	const data = infoRes.data;
-	if (!data?.downloadUrl) {
+	if (!data?.success || !data?.downloadUrl) {
 		throw new Error(data?.error || "downloadUrl paoa jayni API response e");
 	}
 	return data;
@@ -126,7 +126,7 @@ function react(api, messageID, emoji) {
 module.exports.config = {
 	name: "sing",
 	aliases: ["song"],
-	version: "1.0.0",
+	version: "2.0.0",
 	author: "EryXenX",
 	countDown: 5,
 	role: 0,
@@ -162,7 +162,7 @@ module.exports.onStart = async function ({ api, event, args, message }) {
 		await streamDownloadToFile(info.downloadUrl, file);
 
 		await sendWithRetry(message, {
-			body: `🎶 ${video.title}\n🕒 ${video.timestamp}`,
+			body: `🎶 ${info.title || video.title}\n🕒 ${video.timestamp}`,
 			attachment: fs.createReadStream(file)
 		});
 
