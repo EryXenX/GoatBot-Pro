@@ -1,22 +1,18 @@
+// code from goatstore
+// api: https://store.agi.bd
 const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 
-// Store API base is loaded from remote JSON (not hardcoded).
-// Source: https://raw.githubusercontent.com/abdullahrx07/X-api/main/MaRiA/baseApiUrl.json
 const API_URL_JSON = "https://raw.githubusercontent.com/abdullahrx07/X-api/main/MaRiA/baseApiUrl.json";
-const API_FALLBACK = "https://mirai-store.vercel.app";
-// Optional hard override — lets a deployment point this bot file straight at
-// its own store (e.g. a Render URL) without editing the remote baseApiUrl.json.
-// Read lazily so dotenv config in the host bot has already run by the time
-// this file is required.
+const HARD_FALLBACK_BASE = "https://store.agi.bd";
 function envOverride() {
   const v = process.env.STORE_API_BASE;
   return v && v.startsWith("http") ? v.replace(/\/$/, "") : null;
 }
 let _apiBase = null;
 let _apiBaseFetchedAt = 0;
-const API_BASE_TTL_MS = 5 * 60 * 1000; // re-fetch every 5 minutes
+const API_BASE_TTL_MS = 5 * 60 * 1000;
 
 async function getApiBase() {
   const override = envOverride();
@@ -34,9 +30,31 @@ async function getApiBase() {
   } catch (err) {
     console.error("[goatstore] failed to fetch store API URL:", err.message);
   }
-  if (!_apiBase) _apiBase = API_FALLBACK;
+  if (!_apiBase) _apiBase = HARD_FALLBACK_BASE;
   _apiBaseFetchedAt = now;
   return _apiBase;
+}
+
+async function storeGet(pathSuffix, config) {
+  const primaryBase = await getApiBase();
+  try {
+    return await axios.get(`${primaryBase}${pathSuffix}`, config);
+  } catch (err) {
+    if (primaryBase === HARD_FALLBACK_BASE) throw err;
+    console.error(`[goatstore] primary API failed (${primaryBase}), retrying via backup: ${HARD_FALLBACK_BASE}`);
+    return await axios.get(`${HARD_FALLBACK_BASE}${pathSuffix}`, config);
+  }
+}
+
+async function storePost(pathSuffix, data, config) {
+  const primaryBase = await getApiBase();
+  try {
+    return await axios.post(`${primaryBase}${pathSuffix}`, data, config);
+  } catch (err) {
+    if (primaryBase === HARD_FALLBACK_BASE) throw err;
+    console.error(`[goatstore] primary API failed (${primaryBase}), retrying via backup: ${HARD_FALLBACK_BASE}`);
+    return await axios.post(`${HARD_FALLBACK_BASE}${pathSuffix}`, data, config);
+  }
 }
 
 const premium = (function () {
@@ -54,7 +72,7 @@ const premium = (function () {
     if (_refreshing) return _refreshing;
     _refreshing = (async () => {
       try {
-        const res = await axios.get(`${await getApiBase()}/miraistore/premium`);
+        const res = await storeGet(`/miraistore/premium`);
         if (res.data && !res.data.error) {
           state = {
             adminUid: res.data.adminUid || state.adminUid || null,
@@ -94,7 +112,7 @@ const premium = (function () {
 
   async function mutate(action, value, senderId) {
     try {
-      const res = await axios.post(`${await getApiBase()}/miraistore/premium`, { senderId, action, value });
+      const res = await storePost(`/miraistore/premium`, { senderId, action, value });
       const data = res.data || {};
       if (Array.isArray(data.premiumUsers)) {
         state = {
@@ -180,11 +198,10 @@ const premium = (function () {
   };
 })();
 
-// Fingerprint system removed. API base is resolved via getApiBase().
 
 async function checkAbuseGuard(senderID) {
   try {
-    const res = await axios.get(`${await getApiBase()}/miraistore/ratelimit/status`, {
+    const res = await storeGet(`/miraistore/ratelimit/status`, {
       params: { clientFp: senderID },
       timeout: 6000
     });
@@ -229,6 +246,11 @@ function saveSyncCache(cache) {
 }
 
 let _autoupdateInFlight = false;
+
+async function stampUploadCode(code) {
+  const apiBase = await getApiBase();
+  return `// code from goatstore\n// api: ${apiBase}\n${code}`;
+}
 
 function hashContent(content) {
   let h = 0;
@@ -377,7 +399,7 @@ async function checkSelfUpdate() {
   if (_updateCheckCache && (now - _updateCheckCache.checkedAt) < UPDATE_CHECK_INTERVAL)
     return _updateCheckCache.result;
   try {
-    const res = await axios.get(`${await getApiBase()}/miraistore/search?q=goatstore&limit=10&framework=goat&kind=command`);
+    const res = await storeGet(`/miraistore/search?q=goatstore&limit=10&framework=goat&kind=command`);
     const cmds = Array.isArray(res.data?.commands) ? res.data.commands : [];
     const match =
       cmds.find(c => c.name?.toLowerCase() === "goatstore" && c.author === module.exports.config.author) ||
@@ -399,7 +421,7 @@ async function checkSelfUpdate() {
 
 async function getTodayUpdates(senderID = null) {
   try {
-    const res = await axios.get(`${await getApiBase()}/miraistore/list?limit=50&framework=goat&clientFp=${encodeURIComponent(senderID || "")}`);
+    const res = await storeGet(`/miraistore/list?limit=50&framework=goat&clientFp=${encodeURIComponent(senderID || "")}`);
     const today = new Date().toDateString();
     return (res.data.commands || [])
       .filter(cmd => new Date(cmd.uploadDate).toDateString() === today)
@@ -410,7 +432,7 @@ async function getTodayUpdates(senderID = null) {
 async function getTrending(limit = 5) {
   const parse = d => Array.isArray(d) ? d : (Array.isArray(d?.commands) ? d.commands : null);
   try {
-    const res = await axios.get(`${await getApiBase()}/miraistore/trending?limit=${limit}`);
+    const res = await storeGet(`/miraistore/trending?limit=${limit}`);
     const list = parse(res.data);
     if (list) return list.slice(0, limit);
   } catch (_) {}
@@ -450,7 +472,8 @@ async function runAutoSync() {
                     || content.match(/credits\s*:\s*["'`](.*?)["'`]/)?.[1]
                     || "Unknown";
         const category = content.match(/category\s*:\s*["'`](.*?)["'`]/)?.[1] || "Uncategorized";
-        const res = await axios.post(`${await getApiBase()}/miraistore/upload`, { rawCode: content, framework: "goat", kind, author, category });
+        const stampedContent = await stampUploadCode(content);
+        const res = await storePost(`/miraistore/upload`, { rawCode: stampedContent, framework: "goat", kind, author, category });
         if (res.data?.error) {
           console.error(`[goatstore-sync] Upload skipped for ${file}: ${res.data.message || res.data.error}`);
         } else if (res.data?.updated) {
@@ -524,7 +547,7 @@ function autoloadCommand(filePath) {
 async function doInstall(api, threadID, senderID, id, forceKind = null) {
   let cmdData = null;
   try {
-    const res = await axios.get(`${await getApiBase()}/miraistore/search?q=${encodeURIComponent(id)}&clientFp=${encodeURIComponent(senderID || "")}`);
+    const res = await storeGet(`/miraistore/search?q=${encodeURIComponent(id)}&clientFp=${encodeURIComponent(senderID || "")}`);
     const data = res.data;
     if (!isNaN(id) && data?.rawCode && !Array.isArray(data)) cmdData = data;
     else if (Array.isArray(data?.commands)) cmdData = data.commands.find(c => String(c.id) === String(id));
@@ -566,7 +589,7 @@ async function doInstall(api, threadID, senderID, id, forceKind = null) {
     return api.sendMessage(`❌ Failed to write file:\n${err.message}`, threadID);
   }
 
-  try { await axios.post(`${await getApiBase()}/miraistore/install/${cmdData.id}`, { clientFp: senderID }); } catch (_) {}
+  try { await storePost(`/miraistore/install/${cmdData.id}`, { clientFp: senderID }); } catch (_) {}
 
   const load = isEvent ? { success: false } : autoloadCommand(filePath);
 
@@ -593,7 +616,7 @@ async function doInstall(api, threadID, senderID, id, forceKind = null) {
 async function doSelfUpdateSilent(api, threadID, selfUpdate) {
   let cmdData = null;
   try {
-    const res = await axios.get(`${await getApiBase()}/miraistore/search?q=${encodeURIComponent(selfUpdate.latestId)}`);
+    const res = await storeGet(`/miraistore/search?q=${encodeURIComponent(selfUpdate.latestId)}`);
     const data = res.data;
     if (!isNaN(selfUpdate.latestId) && data?.rawCode && !Array.isArray(data)) cmdData = data;
     else if (Array.isArray(data?.commands)) cmdData = data.commands.find(c => String(c.id) === String(selfUpdate.latestId));
@@ -607,7 +630,7 @@ async function doSelfUpdateSilent(api, threadID, selfUpdate) {
     fs.writeFileSync(__filename, cmdData.rawCode, "utf-8");
   } catch (_) { return false; }
 
-  try { await axios.post(`${await getApiBase()}/miraistore/install/${cmdData.id}`, { }); } catch (_) {}
+  try { await storePost(`/miraistore/install/${cmdData.id}`, { }); } catch (_) {}
 
   const changelog = (cmdData.description || cmdData.changelog || "No changelog provided.").trim();
   const load = autoloadCommand(__filename);
@@ -680,7 +703,7 @@ function listBlock(cmd) {
 async function sendListPage(api, threadID, senderID, kind, page, limit = 10, prefix = "!") {
   const offset = (page - 1) * limit;
   try {
-    const res = await axios.get(`${await getApiBase()}/miraistore/list?limit=${limit}&offset=${offset}&framework=goat&kind=${kind}&clientFp=${encodeURIComponent(senderID || "")}`);
+    const res = await storeGet(`/miraistore/list?limit=${limit}&offset=${offset}&framework=goat&kind=${kind}&clientFp=${encodeURIComponent(senderID || "")}`);
     const data = res.data;
     if (!Array.isArray(data.commands) || !data.commands.length)
       return api.sendMessage("❌ No results found for this page.", threadID);
@@ -713,15 +736,15 @@ function searchTitle(query, filterOpts) {
 async function sendSearchPage(api, threadID, senderID, query, page, limit = 5, prefix = "!", filterOpts = {}) {
   const offset = (page - 1) * limit;
   try {
-    let url = `${await getApiBase()}/miraistore/search?limit=${limit}&offset=${offset}`;
-    if (filterOpts.author) url += `&author=${encodeURIComponent(filterOpts.author)}`;
-    else url += `&q=${encodeURIComponent(query || "")}`;
-    if (filterOpts.framework) url += `&framework=${filterOpts.framework}`;
-    if (filterOpts.kind) url += `&kind=${filterOpts.kind}`;
-    if (filterOpts.category) url += `&category=${encodeURIComponent(filterOpts.category)}`;
-    url += `&clientFp=${encodeURIComponent(senderID || "")}`;
+    let qs = `/miraistore/search?limit=${limit}&offset=${offset}`;
+    if (filterOpts.author) qs += `&author=${encodeURIComponent(filterOpts.author)}`;
+    else qs += `&q=${encodeURIComponent(query || "")}`;
+    if (filterOpts.framework) qs += `&framework=${filterOpts.framework}`;
+    if (filterOpts.kind) qs += `&kind=${filterOpts.kind}`;
+    if (filterOpts.category) qs += `&category=${encodeURIComponent(filterOpts.category)}`;
+    qs += `&clientFp=${encodeURIComponent(senderID || "")}`;
 
-    const res = await axios.get(url);
+    const res = await storeGet(qs);
     const data = res.data;
     if (!Array.isArray(data.commands) || !data.commands.length)
       return api.sendMessage(`❌ No results found${query ? ` for "${query}"` : ""}.`, threadID);
@@ -752,7 +775,7 @@ async function sendSearchPage(api, threadID, senderID, query, page, limit = 5, p
 
 async function renderListPageInto(messageID, kind, page, limit, senderID = null) {
   const offset = (page - 1) * limit;
-  const res = await axios.get(`${await getApiBase()}/miraistore/list?limit=${limit}&offset=${offset}&framework=goat&kind=${kind}&clientFp=${encodeURIComponent(senderID || "")}`);
+  const res = await storeGet(`/miraistore/list?limit=${limit}&offset=${offset}&framework=goat&kind=${kind}&clientFp=${encodeURIComponent(senderID || "")}`);
   const data = res.data;
   if (!Array.isArray(data.commands) || !data.commands.length) return null;
 
@@ -767,15 +790,15 @@ async function renderListPageInto(messageID, kind, page, limit, senderID = null)
 
 async function renderSearchPageInto(query, page, limit, filterOpts = {}, senderID = null) {
   const offset = (page - 1) * limit;
-  let url = `${await getApiBase()}/miraistore/search?limit=${limit}&offset=${offset}`;
-  if (filterOpts.author) url += `&author=${encodeURIComponent(filterOpts.author)}`;
-  else url += `&q=${encodeURIComponent(query || "")}`;
-  if (filterOpts.framework) url += `&framework=${filterOpts.framework}`;
-  if (filterOpts.kind) url += `&kind=${filterOpts.kind}`;
-  if (filterOpts.category) url += `&category=${encodeURIComponent(filterOpts.category)}`;
-  url += `&clientFp=${encodeURIComponent(senderID || "")}`;
+  let qs = `/miraistore/search?limit=${limit}&offset=${offset}`;
+  if (filterOpts.author) qs += `&author=${encodeURIComponent(filterOpts.author)}`;
+  else qs += `&q=${encodeURIComponent(query || "")}`;
+  if (filterOpts.framework) qs += `&framework=${filterOpts.framework}`;
+  if (filterOpts.kind) qs += `&kind=${filterOpts.kind}`;
+  if (filterOpts.category) qs += `&category=${encodeURIComponent(filterOpts.category)}`;
+  qs += `&clientFp=${encodeURIComponent(senderID || "")}`;
 
-  const res = await axios.get(url);
+  const res = await storeGet(qs);
   const data = res.data;
   if (!Array.isArray(data.commands) || !data.commands.length) return null;
 
@@ -812,9 +835,10 @@ async function uploadFile(api, threadID, filePath, kind, senderID = null) {
   try { pid = await animateUpload(api, threadID, displayName); } catch (_) {}
 
   try {
-    const body = { rawCode: data, framework: "goat", kind };
+    const stampedData = await stampUploadCode(data);
+    const body = { rawCode: stampedData, framework: "goat", kind };
     if (senderID) { body.uploaderID = senderID; body.clientFp = senderID; }
-    const res = await axios.post(`${await getApiBase()}/miraistore/upload`, body);
+    const res = await storePost(`/miraistore/upload`, body);
 
     if (["Already exists", "Version already exists", "Version too low", "Not allowed", "Upload blocked"].includes(res.data?.error)) {
       if (pid) api.unsendMessage(pid);
@@ -886,7 +910,7 @@ module.exports = {
   config: {
     name: "goatstore",
     aliases: ["gs", "cmdstore", "commandstore"],
-    version: "19.8.0",
+    version: "19.10.0",
     author: "rX",
     countDown: 3,
     role: 2,
@@ -954,7 +978,7 @@ module.exports = {
       const [, delId, delSecret] = delMatch;
       try {
         const payload = delSecret ? { secret: delSecret, userID: senderID } : { userID: senderID };
-        const res = await axios.post(`${await getApiBase()}/miraistore/delete/${delId}`, payload);
+        const res = await storePost(`/miraistore/delete/${delId}`, payload);
         if (res.data?.error) return api.sendMessage(`❌ ${res.data.error}`, threadID);
         return api.sendMessage(`🗑️ Deleted! ID: ${delId}`, threadID);
       } catch (_) { return api.sendMessage("❌ Delete API error.", threadID); }
@@ -993,7 +1017,7 @@ module.exports = {
     const [, id, secret] = rmvMatch;
     try {
       const payload = secret ? { secret, userID: senderID } : { userID: senderID };
-      const res = await axios.post(`${await getApiBase()}/miraistore/delete/${id}`, payload);
+      const res = await storePost(`/miraistore/delete/${id}`, payload);
       if (res.data?.error) return api.sendMessage(`❌ ${res.data.error}`, threadID);
       return api.sendMessage(`🗑️ Deleted! ID: ${id}`, threadID);
     } catch (_) { return api.sendMessage("❌ Delete API error.", threadID); }
@@ -1144,7 +1168,7 @@ module.exports = {
 
       let matched = null;
       try {
-        const res = await axios.get(`${await getApiBase()}/miraistore/search?q=${encodeURIComponent(cmdName)}&kind=command&clientFp=${encodeURIComponent(senderID || "")}`);
+        const res = await storeGet(`/miraistore/search?q=${encodeURIComponent(cmdName)}&kind=command&clientFp=${encodeURIComponent(senderID || "")}`);
         const list = res.data?.commands || [];
         const norm = s => String(s == null ? "" : s).trim().toLowerCase();
         matched = list.find(c => norm(c.name) === norm(cmdName)) || null;
@@ -1258,7 +1282,7 @@ module.exports = {
 
       if (!action) {
         try {
-          const res = await axios.get(`${await getApiBase()}/miraistore/list?limit=20&framework=goat&kind=event&clientFp=${encodeURIComponent(senderID || "")}`);
+          const res = await storeGet(`/miraistore/list?limit=20&framework=goat&kind=event&clientFp=${encodeURIComponent(senderID || "")}`);
           const events = res.data.commands || [];
           if (!events.length) return api.sendMessage("❌ No GoatBot events found in store.", threadID);
           let msg = `📂 GoatBot Store Events (${res.data.total})\n\n`;
@@ -1273,7 +1297,7 @@ module.exports = {
       }
 
       try {
-        const res = await axios.get(`${await getApiBase()}/miraistore/search?q=${encodeURIComponent(action)}&limit=5&framework=goat&kind=event&clientFp=${encodeURIComponent(senderID || "")}`);
+        const res = await storeGet(`/miraistore/search?q=${encodeURIComponent(action)}&limit=5&framework=goat&kind=event&clientFp=${encodeURIComponent(senderID || "")}`);
         const events = res.data.commands || [];
         if (!events.length) return api.sendMessage(`❌ No GoatBot event found: "${action}"`, threadID);
         let msg = `📂 GoatBot Events matching "${action}"\n\n`;
@@ -1297,7 +1321,7 @@ module.exports = {
       const id = args[1];
       if (!id) return api.sendMessage(`❌ Usage: ${prefix}gs like <id>`, threadID);
       try {
-        const res = await axios.post(`${await getApiBase()}/miraistore/like/${id}`, { userID: senderID, clientFp: senderID });
+        const res = await storePost(`/miraistore/like/${id}`, { userID: senderID, clientFp: senderID });
         if (res.data?.message) return api.sendMessage("⚠️ Already liked.", threadID);
         return api.sendMessage(`❤️ Liked! Total Likes: ${res.data.likes}`, threadID);
       } catch (_) { return api.sendMessage("❌ Like API error.", threadID); }
@@ -1340,7 +1364,7 @@ module.exports = {
       if (!id) return api.sendMessage(`❌ Usage: ${prefix}gs delete <id> [secret]`, threadID);
       try {
         const payload = secret ? { secret, userID: senderID } : { userID: senderID };
-        const res = await axios.post(`${await getApiBase()}/miraistore/delete/${id}`, payload);
+        const res = await storePost(`/miraistore/delete/${id}`, payload);
         if (res.data?.error) return api.sendMessage(`❌ ${res.data.error}`, threadID);
         return api.sendMessage(`🗑️ Deleted! ID: ${id}`, threadID);
       } catch (_) { return api.sendMessage("❌ Delete API error.", threadID); }
@@ -1364,7 +1388,7 @@ module.exports = {
 
     const query = args.join(" ");
     try {
-      const res = await axios.get(`${await getApiBase()}/miraistore/search?q=${encodeURIComponent(query)}&kind=command&clientFp=${encodeURIComponent(senderID || "")}`);
+      const res = await storeGet(`/miraistore/search?q=${encodeURIComponent(query)}&kind=command&clientFp=${encodeURIComponent(senderID || "")}`);
       const data = res.data;
       if (!data || data.message) return api.sendMessage("❌ Not found.", threadID);
 
