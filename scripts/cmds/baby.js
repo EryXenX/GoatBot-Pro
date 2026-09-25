@@ -1,8 +1,16 @@
 const axios = require("axios");
 
-let simsim = "";
+const API = axios.create({
+  baseURL: "https://eryxenx.agi.bd/api/simsimi",
+  timeout: 90000
+});
 
 const triggerLocks = new Set();
+
+function errMsg(e) {
+  const d = e && e.response && e.response.data;
+  return (d && (d.message || d.error || d.detail)) || (e && e.message) || "Unknown error";
+}
 
 async function sendTypingIndicatorV2(api, sendTyping, threadID) {
   try {
@@ -13,13 +21,6 @@ async function sendTypingIndicatorV2(api, sendTyping, threadID) {
     console.log("⚠️ Typing indicator error:", err.message);
   }
 }
-
-(async () => {
-  try {
-    const res = await axios.get("https://raw.githubusercontent.com/abdullahrx07/X-api/main/MaRiA/baseApiUrl.json");
-    if (res.data && res.data.mari) simsim = res.data.mari;
-  } catch {}
-})();
 
 let botUID = null;
 function getBotUID(api) {
@@ -34,7 +35,7 @@ function getBotUID(api) {
 
 module.exports.config = {
   name: "baby",
-  version: "4.1.0",
+  version: "5.0.0",
   role: 0,
   author: "EryXenX",
   countTime: 0,
@@ -64,8 +65,6 @@ module.exports.onStart = async function ({ api, event, args, usersData }) {
   const query = args.join(" ").toLowerCase();
 
   try {
-    if (!simsim) return api.sendMessage("❌ API not loaded yet.", event.threadID, event.messageID);
-
     if (args[0] === "autoteach") {
       const mode = args[1];
       const scope = (args[2] || "").toLowerCase();
@@ -75,16 +74,16 @@ module.exports.onStart = async function ({ api, event, args, usersData }) {
       const status = mode === "on";
 
       if (scope === "global") {
-        await axios.post(`${simsim}/setting`, { autoTeach: status });
+        await API.post("/setting", { autoTeach: status });
         return api.sendMessage(`✅ Auto teach is now ${status ? "ON 🟢" : "OFF 🔴"} 𝗚𝗟𝗢𝗕𝗔𝗟𝗟𝗬 (all threads without override)`, event.threadID, event.messageID);
       }
 
-      const res = await axios.post(`${simsim}/setting`, { autoTeach: status, threadID: event.threadID });
+      const res = await API.post("/setting", { autoTeach: status, threadID: event.threadID });
       return api.sendMessage(`✅ ${res.data.message} (𝘁𝗵𝗶𝘀 𝘁𝗵𝗿𝗲𝗮𝗱 𝗼𝗻𝗹𝘆)`, event.threadID, event.messageID);
     }
 
     if (args[0] === "list") {
-      const res = await axios.get(`${simsim}/list`);
+      const res = await API.get("/list");
       return api.sendMessage(
         `╭─╼🌟 𝗕𝗮𝗯𝘆 𝗔𝗜 𝗦𝘁𝗮𝘁𝘂𝘀\n├ 📝 𝗧𝗲𝗮𝗰𝗵𝗲𝗱 𝗤𝘂𝗲𝘀𝘁𝗶𝗼𝗻𝘀: ${res.data.totalQuestions}\n├ 📦 𝗦𝘁𝗼𝗿𝗲𝗱 𝗥𝗲𝗽𝗹𝗶𝗲𝘀: ${res.data.totalReplies}\n╰─╼👤 𝗗𝗲𝘃𝗲𝗹𝗼𝗽𝗲𝗿: 𝗘𝗿𝘆𝗫𝗲𝗻𝗫`,
         event.threadID,
@@ -104,7 +103,7 @@ module.exports.onStart = async function ({ api, event, args, usersData }) {
         if (!trigger) return api.sendMessage("❌ | Use: !baby msg [trigger] -20", event.threadID, event.messageID);
       }
 
-      const res = await axios.get(`${simsim}/simsimi-list?ask=${encodeURIComponent(trigger)}`);
+      const res = await API.get("/simsimi-list", { params: { ask: trigger } });
       if (!res.data.replies || res.data.replies.length === 0)
         return api.sendMessage("❌ No replies found.", event.threadID, event.messageID);
 
@@ -138,7 +137,7 @@ module.exports.onStart = async function ({ api, event, args, usersData }) {
         return api.sendMessage("❌ | Use: teach [Question] - [Reply]", event.threadID, event.messageID);
 
       const [ask, ans] = parts;
-      const res = await axios.get(`${simsim}/teach?ask=${encodeURIComponent(ask)}&ans=${encodeURIComponent(ans)}&senderID=${uid}&senderName=${encodeURIComponent(senderName)}`);
+      const res = await API.get("/teach", { params: { ask, ans, senderID: uid, senderName } });
       return api.sendMessage(`✅ ${res.data.message}`, event.threadID, event.messageID);
     }
 
@@ -152,7 +151,7 @@ module.exports.onStart = async function ({ api, event, args, usersData }) {
       if (!ask.trim() || !emoji.trim())
         return api.sendMessage("❌ | Use: react [Question] - [Emoji]", event.threadID, event.messageID);
 
-      const res = await axios.get(`${simsim}/teachReact?ask=${encodeURIComponent(ask)}&emoji=${encodeURIComponent(emoji)}&senderName=${encodeURIComponent(senderName)}`);
+      const res = await API.get("/teachReact", { params: { ask, emoji, senderName } });
       return api.sendMessage(`✅ ${res.data.message}`, event.threadID, event.messageID);
     }
 
@@ -162,7 +161,7 @@ module.exports.onStart = async function ({ api, event, args, usersData }) {
         return api.sendMessage("❌ | Use: edit [Question] - [OldReply] - [NewReply]", event.threadID, event.messageID);
 
       const [ask, oldR, newR] = parts;
-      const res = await axios.get(`${simsim}/edit?ask=${encodeURIComponent(ask)}&old=${encodeURIComponent(oldR)}&new=${encodeURIComponent(newR)}`);
+      const res = await API.get("/edit", { params: { ask, old: oldR, new: newR } });
       return api.sendMessage(res.data.message, event.threadID, event.messageID);
     }
 
@@ -172,7 +171,7 @@ module.exports.onStart = async function ({ api, event, args, usersData }) {
         return api.sendMessage("❌ | Use: remove [Question] - [Reply]", event.threadID, event.messageID);
 
       const [ask, ans] = parts;
-      const res = await axios.get(`${simsim}/delete?ask=${encodeURIComponent(ask)}&ans=${encodeURIComponent(ans)}`);
+      const res = await API.get("/delete", { params: { ask, ans } });
       return api.sendMessage(res.data.message, event.threadID, event.messageID);
     }
 
@@ -193,7 +192,7 @@ module.exports.onStart = async function ({ api, event, args, usersData }) {
     return await deliverSimsimiResponse({ api, event, query, senderName });
 
   } catch (e) {
-    return api.sendMessage(`❌ Error: ${e.message}`, event.threadID, event.messageID);
+    return api.sendMessage(`❌ Error: ${errMsg(e)}`, event.threadID, event.messageID);
   }
 };
 
@@ -221,19 +220,19 @@ module.exports.onReply = async function ({ api, event, Reply, usersData }) {
     }
   }
 
-  if (!text || !simsim) return;
+  if (!text) return;
 
   if (lowered === "del" || lowered === "!baby del") {
     try {
-      const originalReply = Reply?.body;
+      const originalReply = event.messageReply?.body || Reply?.body;
       if (!originalReply) {
         return api.sendMessage("❌ Couldn't read the original message to delete.", event.threadID, event.messageID);
       }
 
-      const res = await axios.get(`${simsim}/deleteByReply?reply=${encodeURIComponent(originalReply)}`);
+      const res = await API.get("/deleteByReply", { params: { reply: originalReply } });
       return api.sendMessage(res.data.message, event.threadID, event.messageID);
     } catch (e) {
-      return api.sendMessage(`❌ Failed to delete: ${e.message}`, event.threadID, event.messageID);
+      return api.sendMessage(`❌ Failed to delete: ${errMsg(e)}`, event.threadID, event.messageID);
     }
   }
 
@@ -250,20 +249,20 @@ module.exports.onReply = async function ({ api, event, Reply, usersData }) {
     }
 
     try {
-      const res = await axios.post(`${simsim}/keepOnly`, {
+      const res = await API.post("/keepOnly", {
         ask: Reply.trigger,
         keepIndexes: numbers
       });
       return api.sendMessage(res.data.message, event.threadID, event.messageID);
     } catch (e) {
-      return api.sendMessage(`❌ Failed to update: ${e.message}`, event.threadID, event.messageID);
+      return api.sendMessage(`❌ Failed to update: ${errMsg(e)}`, event.threadID, event.messageID);
     }
   }
 
   try {
     return await deliverSimsimiResponse({ api, event, query: lowered, senderName });
   } catch (e) {
-    return api.sendMessage(`❌ Error: ${e.message}`, event.threadID, event.messageID);
+    return api.sendMessage(`❌ Error: ${errMsg(e)}`, event.threadID, event.messageID);
   }
 };
 
@@ -328,12 +327,17 @@ function sendMessageAsync(api, text, threadID, replyToID) {
 }
 
 async function deliverSimsimiResponse({ api, event, query, senderName }) {
-  const url = `${simsim}/simsimi?text=${encodeURIComponent(query)}&senderName=${encodeURIComponent(senderName)}&threadID=${encodeURIComponent(event.threadID)}&senderID=${encodeURIComponent(event.senderID)}`;
-
   await sendTypingIndicatorV2(api, true, event.threadID);
   let res;
   try {
-    res = await axios.get(url);
+    res = await API.get("/", {
+      params: {
+        text: query,
+        senderName,
+        threadID: event.threadID,
+        senderID: event.senderID
+      }
+    });
   } finally {
     await sendTypingIndicatorV2(api, false, event.threadID);
   }
@@ -383,7 +387,6 @@ function isBotMentioned(event, uid) {
 
 module.exports.onChat = async function ({ api, event, usersData }) {
   const text = event.body?.toLowerCase().trim();
-  if (!simsim) return;
 
   const senderName = await getUserName(api, event.senderID, usersData);
   const triggers = ["baby", "bot", "bby", "beby", "bbz", "xan", "jan", "janu", "xanu", "বেবি", "জান", "বট", "জানু"];
@@ -423,7 +426,7 @@ module.exports.onChat = async function ({ api, event, usersData }) {
     try {
       return await deliverSimsimiResponse({ api, event, query, senderName });
     } catch (e) {
-      return api.sendMessage(`❌ Error: ${e.message}`, event.threadID, event.messageID);
+      return api.sendMessage(`❌ Error: ${errMsg(e)}`, event.threadID, event.messageID);
     } finally {
       triggerLocks.delete(event.threadID);
     }
@@ -431,7 +434,7 @@ module.exports.onChat = async function ({ api, event, usersData }) {
 
   if (event.type === "message_reply") {
     try {
-      const setting = await axios.get(`${simsim}/setting?threadID=${encodeURIComponent(event.threadID)}`);
+      const setting = await API.get("/setting", { params: { threadID: event.threadID } });
       if (!setting.data.autoTeach) return;
 
       const ask = event.messageReply.body?.toLowerCase().trim();
@@ -440,14 +443,14 @@ module.exports.onChat = async function ({ api, event, usersData }) {
 
       setTimeout(async () => {
         try {
-          await axios.get(`${simsim}/teach?ask=${encodeURIComponent(ask)}&ans=${encodeURIComponent(ans)}&senderName=${encodeURIComponent(senderName)}`);
+          await API.get("/teach", { params: { ask, ans, senderName } });
           console.log("✅ Auto-taught:", ask, "→", ans, "(thread:", event.threadID + ")");
         } catch (err) {
-          console.error("❌ Auto-teach internal error:", err.message);
+          console.error("❌ Auto-teach internal error:", errMsg(err));
         }
       }, 300);
     } catch (e) {
-      console.log("❌ Auto-teach setting error:", e.message);
+      console.log("❌ Auto-teach setting error:", errMsg(e));
     }
   }
 };
