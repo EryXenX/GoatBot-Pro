@@ -2,7 +2,7 @@ const axios = require("axios");
 
 const API = axios.create({
   baseURL: "https://eryxenx.agi.bd/api/simsimi",
-  timeout: 90000
+  timeout: 20000
 });
 
 const triggerLocks = new Set();
@@ -35,7 +35,7 @@ function getBotUID(api) {
 
 module.exports.config = {
   name: "baby",
-  version: "5.0.0",
+  version: "6.0.0",
   role: 0,
   author: "EryXenX",
   countTime: 0,
