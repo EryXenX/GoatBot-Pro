@@ -1,0 +1,155 @@
+# index.js
+Goat.newVersionDetected=Aap %1 version use kar rahe hain, latest version %2 hai. Better experience ke liye update karein: %3
+Goat.autoRestart1=Bot %1 mein automatically restart hoga
+Goat.autoRestart2=Bot cron job ke anusar automatically restart hoga: %1
+Goat.googleApiTokenExpired=Google API refresh token expire ya revoke ho gaya hai, naya token lein: https://developers.google.com/oauthplayground/
+
+# bot/login/login.js
+login.currentlyLogged=Login process chal rahi hai
+login.notFoundDirAccount=%1 file nahi mili
+login.loginToken=Access token se login ho raha hai
+login.loginCookieString=Cookie string se login ho raha hai
+login.loginCookieNetscape=Cookie netscape se login ho raha hai
+login.loginCookieArray=Cookie array se login ho raha hai
+login.loginPassword=Email aur password se login ho raha hai...
+login.accountError=Kripya %1 ke roop mein full permission token ya %2 ke roop mein cookie string ya array:\n[\n  { name: %3, value: %4 },\n  { name: %5, value: %6 }\n]\n ya\n[\n  { key: %3, value: %4 },\n  { key: %5, value: %6 }\n]\n%7 file mein darj karein
+login.cannotFindAccount=Facebook account nahi mila, neeche diye options mein se ek chunein:
+login.chooseAccount=Email aur password se login
+login.chooseToken=Full permission token se login
+login.chooseCookieString=Cookie string se login
+login.chooseCookieArray=Cookie array se login
+login.loginWith=Aapne %1 chuna
+login.inputEmail=> Kripya apna email (id) ya Facebook phone number darj karein:
+login.inputPassword=> Kripya apna password darj karein:
+login.input2FA=> Kripya 2FA code darj karein (khali chhoden agar nahi hai):
+login.inputToken=> Kripya full permission token darj karein (EAAAA se shuru hota hai):
+login.inputCookieString=> Kripya cookie string darj karein:
+login.inputCookieArray=> Kripya cookie array darj karein:
+login.refreshCookie=Cookie refresh ho rahi hai...
+login.refreshCookieError=Cookie refresh karne mein error aayi
+login.refreshCookieSuccess=Cookie successfully refresh hui, naya cookie use karne ke liye bot restart karein
+login.refreshCookieWarning=Auto refresh cookie mode on hai lekin config.json mein email aur password configure nahi hai
+login.tokenError=Token invalid ya expire ho gaya hai. Kripya %1 ke roop mein full permission token %2 file mein darj karein
+login.cookieError=Cookie invalid ya expire ho gayi hai.
+login.loginPasswordError=config.json mein email aur password se login karne mein error aayi
+login.loginSuccess=Login successful raha
+login.loginError=Login karte waqt error aayi
+login.openDashboardSuccess=Bot management page successfully khula
+login.openDashboardError=Bot management page kholne mein error aayi
+login.changeGbanData=Data badal diya gaya hai, abhi bot shuru karna sambhav nahi hai
+login.errorNoti=Message prapt karne mein error aayi
+login.refreshFbstateSuccess=%1 file refresh hui
+login.refreshFbstateError=%1 file refresh karne mein error aayi
+login.youAreBanned=Aapko Goat-Bot project se ban kiya gaya hai
+login.runBot=Bot successfully shuru hua, users se messages prapt hona shuru hua
+login.notLoggedIn=Error aayi, kripya apna Facebook account dobara check karein
+login.callBackError=listenMqtt callback mein error aayi
+login.userBanned=Aapko bot use karne se ban kiya gaya hai!!
+login.checkGbanError=GBAN check karne mein error aayi, latest version mein update karein (cmd mein type karein: node update)
+login.gbanMessage=Aapko %1 ko Goat-Bot project se ban kiya gaya, karan: %2\n» Samay: %3
+login.gbanMessageToDate=Aapko %1 ko Goat-Bot project se ban kiya gaya, karan: %2\n» Samay: %3\n» Tak: %4
+login.gbanAdminMessage=User %1 ko %2 ko Goat-Bot project se ban kiya gaya, karan: %3
+login.openServerUptimeSuccess=🚀 Uptime server khula: %1
+login.openServerUptimeError=Error aayi, uptime server nahi khul saka
+login.restartListenMessage=Har %1 mein ListenMQTT restart enable hai
+login.stopRestartListenMessage=ListenMQTT restart disable hai
+login.restartListenMessageError=ListenMQTT restart karne mein error aayi
+login.restartListenMessage2=ListenMQTT successfully restart hua
+login.refreshCookieAfter=%1 ke baad cookie automatically refresh hogi
+login.listenMqttClose=ListenMQTT band hua
+login.listenMqttCloseByUser=User dwara ListenMQTT band kiya gaya
+login.retryCheckLiveCookie=Cookie dobara check ho rahi hai... %1
+login.startBotSuccess=Bot successfully shuru hua, users se messages prapt hona shuru hua
+
+version.tooOldVersion=Aap Goat-Bot ka bahut purana version use kar rahe hain, kripya latest version mein update karein: %1
+
+# bot/custom.js
+custom.refreshedFb_dtsg=fb_dtsg aur jazoest successfully refresh hue
+custom.refreshedFb_dtsgError=fb_dtsg aur jazoest refresh karne mein error aayi
+
+# bot/login/loadData.js
+loadData.loadThreadDataSuccess=%1 group ka data successfully load hua!
+loadData.loadUserDataSuccess=%1 user ka data successfully load hua!
+loadData.refreshingThreadData=Group ki jankari update ho rahi hai...
+loadData.refreshThreadDataSuccess=%1 group ki jankari update hui!
+loadData.refreshThreadDataError=Group ki jankari update karne mein error aayi!
+
+# bot/login/loadScripts.js
+loadScripts.loadScriptsError=%1 files load karte waqt error aayi:
+loadScripts.loadScriptsNotMatchOrigin=%1 files github project ki original files se match nahi karti:
+loadScripts.NOT_FOUND=Original source code mein nahi mila:
+loadScripts.NOT_MATCH=Original source code se match nahi karta:
+
+# bot/login/socketIO.js
+socketIO.connected=Socket.io server se connect hua
+socketIO.error=Socket.io server se connect karne mein error aayi
+
+# bot/handler/handlerCheckData.js
+handlerCheckData.cantCreateThread=Id '%1' wale group ko database mein nahi likha ja saka!
+handlerCheckData.cantCreateUser=Id '%1' wale user ko database mein nahi likha ja saka!
+
+# bot/handler/handlerEvents.js
+handlerEvents.userBanned=⦸ Banned User\n━━━━━━━━━━━━━━━━━\n› Karan  : %1\n› Samay  : %2\n› User   : %3
+handlerEvents.threadBanned=⦸ Banned Group\n━━━━━━━━━━━━━━━━━\n› Karan  : %1\n› Samay  : %2\n› Thread : %3
+handlerEvents.onlyAdminBox=⛉ Sirf Admin\n━━━━━━━━━━━━━━━━━\n› Sirf group admin hi is bot ka use kar sakte hain.
+handlerEvents.onlyAdminBot=ⴵ Restricted\n━━━━━━━━━━━━━━━━━\n› Yeh sirf bot admin ke liye hai.
+handlerEvents.prefixOnly=𝗛𝗲𝘆! Main active hoon\n━━━━━━━━━━━━━━━━━\n› Sabhi commands dekhne ke liye %1help type karein
+handlerEvents.commandNotFoundSuggestion=𝗫 Command nahi mila\n━━━━━━━━━━━━━━━━━\n✦ Kya aapka matlab tha?\n%1
+handlerEvents.commandSyntaxError=𝗫 Galat Syntax\n━━━━━━━━━━━━━━━━━\n› Sahi use ke liye %1help %2 type karein.
+handlerEvents.onlyAdmin=⛉ Sirf Admin\n━━━━━━━━━━━━━━━━━\n› Sirf group admin "%1" use kar sakte hain.
+handlerEvents.onlyAdminToUseOnReply=⛉ Sirf Admin\n━━━━━━━━━━━━━━━━━\n› Sirf admin "%1" par reply kar sakte hain.
+handlerEvents.onlyAdminToUseOnReaction=⛉ Sirf Admin\n━━━━━━━━━━━━━━━━━\n› Sirf admin "%1" par react kar sakte hain.
+handlerEvents.onlyAdminBot2=ⴵ Restricted\n━━━━━━━━━━━━━━━━━\n› "%1" sirf bot admin ke liye hai.
+handlerEvents.onlyAdminBot2ToUseOnReply=ⴵ Restricted\n━━━━━━━━━━━━━━━━━\n› "%1" par reply sirf bot admin kar sakte hain.
+handlerEvents.onlyAdminBot2ToUseOnReaction=ⴵ Restricted\n━━━━━━━━━━━━━━━━━\n› "%1" par react sirf bot admin kar sakte hain.
+handlerEvents.waitingForCommand=ⴵ Cooldown\n━━━━━━━━━━━━━━━━━\n› Kripya %1 second baad dobara try karein.
+handlerEvents.errorOccurred=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› Cmd : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.errorOccurred2=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› onChat : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.errorOccurred3=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› onReply : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.errorOccurred4=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› onReaction : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.errorOccurred5=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› onEvent : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.errorOccurred6=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› onEvent : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.errorOccurred7=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› onAnyEvent : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.cannotFindCommandName=𝗫 Failed\n━━━━━━━━━━━━━━━━━\n› Is reply ke liye command name nahi mila.
+handlerEvents.cannotFindCommand=𝗫 Failed\n━━━━━━━━━━━━━━━━━\n› Is reply ke liye "%1" command nahi mila.
+
+# bot/autoUptime.js
+autoUptime.autoUptimeTurnedOn=AutoUptime mode on hua
+
+# database/controller/index.js
+indexController.connectingMongoDB=MONGODB database se connect ho raha hai
+indexController.connectMongoDBSuccess=MongoDB database se successfully connect hua!
+indexController.connectMongoDBError=MongoDB database se connect karne mein error aayi:
+indexController.connectingMySQL=SQLITE database se connect ho raha hai
+indexController.connectMySQLSuccess=SQLITE database se successfully connect hua!
+indexController.connectMySQLError=SQLITE database se connect karne mein error aayi:
+
+# updater.js
+updater.updateTooFast=Kripya latest commit ke baad kam se kam 5 minute wait karein, %1 minute %2 second baki hain
+updater.latestVersion=Aap latest version use kar rahe hain
+updater.cantFindVersion=Aap undefined version (%1) use kar rahe hain, kripya package.json dobara check karein
+updater.newVersions=%1 naye versions available hain, update shuru ho raha hai...
+updater.updateSuccess=Successfully update hua%1
+updater.configChanged=%1 file badal gayi hai, kripya config.json dobara check karein
+updater.installingPackages=Bot ke liye dependencies install ho rahi hain...
+updater.installSuccess=Dependencies successfully install hui, naye version ke liye bot restart karein
+updater.backupSuccess=Badle hui files ka backup successfully liya gaya, %1 folder mein dekhein
+updater.restartToApply=. Naye version ke liye bot restart karein
+updater.skipFile=%1 file ka naya version available hai, lekin aapne %2 comment ke saath ise skip kiya
+
+# dashboard/routes/verifyfbid.js
+verifyfbid.sendCode=Aapka verification code hai:\n%1\nCode %2 minute tak valid hai
+
+# utils.js
+utils.errorOccurred=❌ Error aayi:\n\n%1
+
+# for command
+command.restartedBot=Bot restart hua
+
+# dashboard/app.js
+app.googleApiRefreshTokenExpired=Google API refresh token expire ya revoke ho gaya, naya token lein: https://developers.google.com/oauthplayground/
+app.tooManyRequests=Pichhle ek minute mein bahut zyada requests. Kripya baad mein dobara try karein.
+app.notPermissionChangeFbstate=Aapko fbstate badalne ki anumati nahi hai!
+app.notFoundFbstate=Kripya fbstate darj karein!
+app.changedFbstateSuccess=Fbstate successfully badla gaya!
+app.serverError=Server mein error aayi, kripya baad mein dobara try karein!

@@ -1,0 +1,71 @@
+<%~ includeFile("partials/header", {
+	user: user
+}); %>
+<%~ includeFile("partials/message.eta"); %>
+<%~ includeFile("partials/title.eta", {
+	icon: "fas fa-robot",
+	title: "Bot stats"
+}); %>
+
+<section class="post my-4">
+  <div class="container">
+    <table class="table table-borderless">
+      <tbody>
+        <tr class="text-start">
+          <td><i class="fas fa-users"></i> Users</td>
+          <td>
+            <%= totalUser %>
+          </td>
+        </tr>
+        <tr class="text-start">
+          <td><i class="fas fa-server"></i> Threads</td>
+          <td>
+            <%= totalThread %>
+          </td>
+        </tr>
+        <tr class="text-start">
+          <td><i class="fas fa-hashtag"></i> Prefix</td>
+          <td>
+            <%= prefix %>
+          </td>
+        </tr>
+        <tr class="text-start">
+          <td><i class="fa fa-clock"></i> Uptime</td>
+          <td id="uptime">
+            <%= uptime %>
+          </td>
+        </tr>
+        <tr class="text-start">
+          <td><i class="fab fa-node-js"></i> Node.js Version</td>
+          <td>
+            <%= process.version %>
+          </td>
+        </tr>
+        <tr class="text-start">
+          <td><i class="fa-solid fa-memory"></i> Memory</td>
+          <td>
+						<%= (process.memoryUsage().rss / 1024 / 1024).toFixed(2) %> MB
+          </td>
+        </tr>
+				<tr class="text-start">
+					<td style="font-size: 15px;"><i class="fa-solid fa-memory"></i> CPU</td>
+					<td style="font-size: 15px;">
+						<%= (process.cpuUsage().system / 1024 / 1024).toFixed(2) %>%
+					</td>
+				</tr>
+				<tr class="text-start">
+					<td style="font-size: 15px;"><i class="fa-solid fa-memory"></i> Node CPU</td>
+					<td style="font-size: 15px;">
+						<%= (process.cpuUsage().user / 1024 / 1024).toFixed(2) %>%
+					</td>
+				</tr>
+			</tbody>
+    </table>
+  </div>
+</section>
+
+<script type="text/javascript">
+  function cvt(e,t="giây",o="phút ",n="giờ ",r="ngày ",a="tháng ",c="năm "){const u=Math.floor(e/1e3%60),i=Math.floor(e/1e3/60%60),l=Math.floor(e/1e3/60/60%24),f=Math.floor(e/1e3/60/60/24%30),h=Math.floor(e/1e3/60/60/24/30%12),m=Math.floor(e/1e3/60/60/24/30/12);return`${m?m+c:""}${h?h+a:m?"00"+a:""}${f?f+r:h||m?"00"+r:""}${l?l+n:f||h||m?"00"+n:""}${i?i+o:l||f||h||m?"00"+o:""}${u}${t}`}let countDownDate=Number("<%=uptimeSecond%>");setInterval((function(){countDownDate+=1,document.getElementById("uptime").innerHTML=cvt(1e3*countDownDate)}),1e3);
+</script>
+
+<%~ includeFile("partials/footer") %>

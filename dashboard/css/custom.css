@@ -1,0 +1,241 @@
+@import url('https://fonts.googleapis.com/css?family=Josefin+Sans&display=swap');
+
+/* ======= Toast message ======== */
+#toast {
+	position: fixed;
+	top: 32px;
+	right: 32px;
+	z-index: 999999;
+}
+
+.toast:not(.show) {
+	display: flex;
+}
+
+.toast+.toast {
+	margin-top: 24px;
+}
+
+.toast {
+	/* position: absolute; */
+	top: 25px;
+	right: 30px;
+	border-radius: 12px;
+	background: var(--phoenix-white);
+	padding: 20px 35px 20px 25px;
+	box-shadow: 0 5px 8px rgba(0, 0, 0, 0.08);
+	overflow: hidden;
+	transform: translateX(calc(100% + 30px));
+	transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.35);
+	transform: translateX(0%);
+}
+
+
+@keyframes slideInLeft {
+	from {
+		opacity: 0;
+		transform: translateX(calc(100% + 32px));
+	}
+
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes fadeOut {
+	to {
+		opacity: 0;
+	}
+}
+
+
+.toast .toast-content {
+	display: flex;
+	align-items: center;
+}
+
+.toast-content .check {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 35px;
+	min-width: 35px;
+	background-color: #2770ff;
+	color: #fff;
+	font-size: 20px;
+	border-radius: 50%;
+}
+
+.toast-content .message {
+	display: flex;
+	flex-direction: column;
+	margin: 0 20px;
+}
+
+.message .text {
+	font-size: 16px;
+	font-weight: 400;
+	color: #666666;
+}
+
+.message .text.text-1 {
+	font-weight: 600;
+	color: #333;
+}
+
+.toast .close {
+	position: absolute;
+	top: 10px;
+	right: 15px;
+	padding: 5px;
+	cursor: pointer;
+	opacity: 0.7;
+}
+
+.toast .close:hover {
+	opacity: 1;
+}
+
+.toast .progress {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	height: 3px;
+	width: 100%;
+
+}
+
+.toast .warning,
+.toast .error,
+.toast .success,
+.toast .info {
+	font-size: 25px;
+	font-weight: 600;
+}
+
+.toast .warning {
+	color: #ff9f43;
+}
+
+.toast .error {
+	color: #ff5b5b;
+}
+
+.toast .success {
+	color: #00d68f;
+}
+
+.toast .info {
+	color: #2770ff;
+}
+
+.toast .progress:before {
+	content: "";
+	position: absolute;
+	bottom: 0;
+	right: 0;
+	height: 100%;
+	width: 100%;
+}
+
+/* < 400px */
+@media (max-width: 400px) {
+	.toast {
+		padding: 14px 16px;
+	}
+
+	#toast {
+		top: 12px;
+		right: 10px;
+	}
+
+	.message .text {
+		font-size: 14px;
+		font-weight: 400;
+		color: #666666;
+	}
+
+	.toast .warning,
+	.toast .error,
+	.toast .success,
+	.toast .info {
+		font-size: 22px;
+		font-weight: 600;
+	}
+}
+
+@keyframes progress {
+	100% {
+		right: 100%;
+	}
+}
+
+/* ======= End Toast ======== */
+
+/* ======= Copy To Clipboard ======== */
+.copyToClipboard {
+	cursor: pointer;
+}
+/* 
+.hwt-container {
+	display: inline-block;
+	position: relative;
+	overflow: hidden !important;
+	-webkit-text-size-adjust: none !important;
+}
+
+.hwt-backdrop {
+	position: absolute !important;
+	top: 0 !important;
+	right: -99px !important;
+	bottom: 0 !important;
+	left: 0 !important;
+	padding-right: 99px !important;
+	overflow-x: hidden !important;
+	overflow-y: auto !important;
+}
+
+.hwt-highlights {
+	width: auto !important;
+	height: auto !important;
+	border-color: transparent !important;
+	white-space: pre-wrap !important;
+	word-wrap: break-word !important;
+	color: transparent !important;
+	overflow: hidden !important;
+}
+
+.hwt-input {
+	display: block !important;
+	position: relative !important;
+	margin: 0;
+	padding: 0;
+	border-radius: 0;
+	font: inherit;
+	overflow-x: hidden !important;
+	overflow-y: auto !important;
+}
+
+.hwt-content {
+	width: 100%;
+	padding: 1rem;
+	border: 1px solid;
+	background: none transparent !important;
+}
+
+.hwt-content mark {
+	padding: 0 !important;
+	color: inherit;
+} */
+
+.spinner-border-sm {
+	--phoenix-spinner-width: 1rem;
+	--phoenix-spinner-height: 1rem;
+	--phoenix-spinner-border-width: 0.2em;
+}
+
+.spinner-grow-sm {
+	--phoenix-spinner-width: 1rem;
+	--phoenix-spinner-height: 1rem;
+}

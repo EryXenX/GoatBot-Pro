@@ -1,0 +1,78 @@
+<%~ includeFile("partials/header.eta", {
+	user: user
+}); %>
+<%~ includeFile("partials/message.eta"); %>
+<%~ includeFile("partials/title.eta", {
+	icon: "fa-solid fa-address-card",
+	title: "User Profile"
+}); %>
+
+<section class="post my-4" style="text-align: -webkit-center">
+  <div class="wrapper">
+    <div class="right">
+      <div class="info">
+        <h3>Information</h3>
+        <div class="info_data">
+          <div class="data">
+            <h4>Email</h4>
+            <p>
+              <%= user.email %>
+            </p>
+          </div>
+          <div class="data">
+            <h4>Name</h4>
+            <p>
+              <%= user.name %>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="projects">
+        <h3>Economy</h3>
+        <% if (!user.facebookUserID) { %>
+        <div class="data">
+          <p style="color: #919aa3">
+            Bạn chưa xác thực id facebook
+          </p>
+        </div>
+        <% } else { %>
+        <div class="projects_data">
+          <div class="data">
+            <h4>Money</h4>
+            <p id="money"><%=userData.hasOwnProperty('money') ? userData.money : ''%></p>
+          </div>
+          <div class="data">
+            <h4>Level</h4>
+            <p id="level"><%=userData.hasOwnProperty('exp') ? Math.floor((1 + Math.sqrt(1 + 8 * userData.exp / 5)) / 2) : ''%></p>
+          </div>
+        </div>
+        <% } %>
+      </div>
+
+      <div class="projects">
+        <h3>Facebook Info</h3>
+        <% if (!user.facebookUserID) {%>
+        <div class="data">
+          <p style="color: #919aa3">
+            Bạn chưa xác thực id facebook
+          </p>
+        </div>
+        <% } else { %>
+        <div class="projects_data">
+          <div class="data">
+            <h4>User ID</h4>
+            <p id="facebookUserID"><%=user.facebookUserID%></p>
+          </div>
+          <div class="data">
+            <h4>Name</h4>
+            <p id="facebookUserName"><%=userData.name%></p>
+          </div>
+        </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%~ includeFile("partials/footer.eta") %>

@@ -1,0 +1,99 @@
+<%~ includeFile("partials/header.eta", {
+	user: user
+}); %>
+<%~ includeFile("partials/message.eta"); %>
+<%~ includeFile("partials/title.eta", {
+	icon: "fa-solid fa-right-to-bracket",
+	title: "Login"
+}); %>
+
+<div class="container">
+  <div class="row flex-center justify-content-center align-items-center">
+    <div class="p-4 col-12 col-md-8 col-lg-5 col-xl-4">
+      <div class="form-outline mb-4">
+        <label class="form-label" for="username">Email address</label>
+        <input type="email" id="username" class="form-control" id="username" />
+      </div>
+
+      <div class="form-outline mb-4">
+        <label class="form-label" for="password">Password</label>
+        <input type="password" id="password" class="form-control" />
+      </div>
+
+      <div class="g-recaptcha d-flex justify-content-center" data-sitekey="<%=it.gRecaptcha_siteKey%>">
+      </div>
+
+      <div class="row mb-2 mt-2">
+        <div class="col d-flex justify-content-center">
+          <div class="form-check">
+            <label class="form-check-label" for="remember"> Remember me </label>
+            <input class="form-check-input" type="checkbox" id="remember" />
+          </div>
+        </div>
+
+        <div class="col">
+          <a href="/forgot-password">Forgot password?</a>
+        </div>
+      </div>
+
+			<div class="d-flex justify-content-center btn-block">
+				<button type="button" class="btn btn-phoenix-primary mb-4" id="login">Login</button>
+			</div>
+
+      <div class="text-center">
+        <p>No Account? <a href="/register">Register</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="text/javascript">
+  (function() {
+    $("#login").on("click", async function(e) {
+      e.preventDefault();
+      const username = $("#username").val();
+      const password = $("#password").val();
+      const remember = $("#remember").is(":checked");
+      const gRecaptcha = grecaptcha.getResponse();
+      if (!gRecaptcha)
+        return $.createToast({
+          type: "error",
+          title: "Error",
+          message: "Vui lòng xác nhận captcha",
+          time: 5000
+        });
+      const btnLogin = this;
+      btnLogin.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Login';
+      btnLogin.disabled = true;
+
+      $.ajax({
+        url: "/login",
+        type: "POST",
+        data: {
+          username: username,
+          password: password,
+          remember: remember,
+          "g-recaptcha-response": gRecaptcha
+        },
+        success: function(data) {
+          window.location.href = data.redirectLink;
+        },
+        error: function(data) {
+          data.responseJSON.errors.forEach(function(error) {
+            btnLogin.innerHTML = 'Login';
+            btnLogin.disabled = false;
+            grecaptcha.reset();
+            $.createToast({
+              type: "error",
+              title: "Error",
+              message: error.msg
+            });
+          });
+        }
+      });
+    });
+  })();
+</script>
+
+<!--footer section-->
+<%~ includeFile("partials/footer.eta") %>

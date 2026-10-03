@@ -1,0 +1,32 @@
+<%~ includeFile("partials/header.eta", {
+	user: user
+}); %>
+<%~ includeFile("partials/message.eta"); %>
+<%~ includeFile("partials/title.eta", {
+	icon: "fa-solid fa-ranking-star",
+	title: "Rankup"
+}); %>
+
+<div class="container">
+  <div class="row mt-5">
+    <div class="col-md-12">
+      <div class="alert alert-warning" role="alert">
+        <h4 class="alert-heading">Warning!</h4>
+        <p>This feature is currently under construction. Please come back later.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="text/javascript">
+  (function() {
+    $.createToast({
+      title: "Comming soon",
+      message: "Tính năng này đang được phát triển. Vui lòng quay lại sau.",
+      type: "warning",
+      time: 10000
+    });
+  })();
+</script>
+
+<%~ includeFile("partials/footer.eta") %>
