@@ -35,14 +35,14 @@ function getBotUID(api) {
 
 module.exports.config = {
   name: "baby",
-  version: "6.0.0",
+  version: "8.0.0",
   role: 0,
   author: "EryXenX",
   countTime: 0,
   category: "chat",
   shortDescription: "AI auto teach chat (Simsimi-style)",
   longDescription: "AI auto teach with Teach & List support + Typing effect",
-  guide: "{pn} [query]\n{pn} list\n{pn} teach [Question] - [Reply]\n{pn} react [Question] - [Emoji]\n{pn} edit [Question] - [OldReply] - [NewReply]\n{pn} remove/rm [Question] - [Reply]\n{pn} del (reply to bot's wrong answer)\n{pn} msg [trigger]\n{pn} msg [trigger] -20 (custom show limit)\n{pn} autoteach on/off (per-thread)\n{pn} autoteach on/off global (all threads default)",
+  guide: "{pn} [query]\n{pn} list\n{pn} teach [Question] - [Reply]\n{pn} react [Question] - [Emoji]\n{pn} edit [Question] - [OldReply] - [NewReply]\n{pn} remove/rm [Question] - [Reply]\n{pn} del (reply to bot's wrong answer)\n{pn} msg [trigger]\n{pn} msg [trigger] -20 (custom show limit)",
   envConfig: {}
 };
 
@@ -66,20 +66,13 @@ module.exports.onStart = async function ({ api, event, args, usersData }) {
 
   try {
     if (args[0] === "autoteach") {
-      const mode = args[1];
-      const scope = (args[2] || "").toLowerCase();
-      if (!["on", "off"].includes(mode))
-        return api.sendMessage("✅ Use: baby autoteach on/off\nOr: baby autoteach on/off global", event.threadID, event.messageID);
-
-      const status = mode === "on";
-
-      if (scope === "global") {
-        await API.post("/setting", { autoTeach: status });
-        return api.sendMessage(`✅ Auto teach is now ${status ? "ON 🟢" : "OFF 🔴"} 𝗚𝗟𝗢𝗕𝗔𝗟𝗟𝗬 (all threads without override)`, event.threadID, event.messageID);
-      }
-
-      const res = await API.post("/setting", { autoTeach: status, threadID: event.threadID });
-      return api.sendMessage(`✅ ${res.data.message} (𝘁𝗵𝗶𝘀 𝘁𝗵𝗿𝗲𝗮𝗱 𝗼𝗻𝗹𝘆)`, event.threadID, event.messageID);
+      const res = await API.get("/autoteach/stats");
+      const { today = 0, total = 0 } = res.data || {};
+      return api.sendMessage(
+        `╭─╼🌟 𝗔𝘂𝘁𝗼𝘁𝗲𝗮𝗰𝗵 𝗦𝘁𝗮𝘁𝘂𝘀\n├ 🟢 𝗦𝘁𝗮𝘁𝘂𝘀: 𝗔𝗹𝘄𝗮𝘆𝘀 𝗢𝗡\n├ 📅 𝗧𝗼𝗱𝗮𝘆: ${today}\n╰─╼📊 𝗧𝗼𝘁𝗮𝗹: ${total}`,
+        event.threadID,
+        event.messageID
+      );
     }
 
     if (args[0] === "list") {
@@ -192,6 +185,7 @@ module.exports.onStart = async function ({ api, event, args, usersData }) {
     return await deliverSimsimiResponse({ api, event, query, senderName });
 
   } catch (e) {
+    console.error("❌ [baby/onStart] error:", e);
     return api.sendMessage(`❌ Error: ${errMsg(e)}`, event.threadID, event.messageID);
   }
 };
@@ -232,6 +226,7 @@ module.exports.onReply = async function ({ api, event, Reply, usersData }) {
       const res = await API.get("/deleteByReply", { params: { reply: originalReply } });
       return api.sendMessage(res.data.message, event.threadID, event.messageID);
     } catch (e) {
+      console.error("❌ [baby/del] error:", e);
       return api.sendMessage(`❌ Failed to delete: ${errMsg(e)}`, event.threadID, event.messageID);
     }
   }
@@ -255,6 +250,7 @@ module.exports.onReply = async function ({ api, event, Reply, usersData }) {
       });
       return api.sendMessage(res.data.message, event.threadID, event.messageID);
     } catch (e) {
+      console.error("❌ [baby/keepOnly] error:", e);
       return api.sendMessage(`❌ Failed to update: ${errMsg(e)}`, event.threadID, event.messageID);
     }
   }
@@ -262,6 +258,7 @@ module.exports.onReply = async function ({ api, event, Reply, usersData }) {
   try {
     return await deliverSimsimiResponse({ api, event, query: lowered, senderName });
   } catch (e) {
+    console.error("❌ [baby/onReply] error:", e);
     return api.sendMessage(`❌ Error: ${errMsg(e)}`, event.threadID, event.messageID);
   }
 };
@@ -426,31 +423,21 @@ module.exports.onChat = async function ({ api, event, usersData }) {
     try {
       return await deliverSimsimiResponse({ api, event, query, senderName });
     } catch (e) {
+      console.error("❌ [baby/onChat] error:", e);
       return api.sendMessage(`❌ Error: ${errMsg(e)}`, event.threadID, event.messageID);
     } finally {
       triggerLocks.delete(event.threadID);
     }
   }
 
-  if (event.type === "message_reply") {
-    try {
-      const setting = await API.get("/setting", { params: { threadID: event.threadID } });
-      if (!setting.data.autoTeach) return;
+  if (!event.isGroup || !event.senderID || event.senderID === uid) return;
 
-      const ask = event.messageReply.body?.toLowerCase().trim();
-      const ans = event.body?.toLowerCase().trim();
-      if (!ask || !ans || ask === ans) return;
-
-      setTimeout(async () => {
-        try {
-          await API.get("/teach", { params: { ask, ans, senderName } });
-          console.log("✅ Auto-taught:", ask, "→", ans, "(thread:", event.threadID + ")");
-        } catch (err) {
-          console.error("❌ Auto-teach internal error:", errMsg(err));
-        }
-      }, 300);
-    } catch (e) {
-      console.log("❌ Auto-teach setting error:", errMsg(e));
-    }
+  try {
+    await API.get("/autoteach", {
+      params: { text: event.body, senderName, senderID: event.senderID, threadID: event.threadID },
+      timeout: 10000
+    });
+  } catch (e) {
+    console.error("❌ [baby/autoteach] network error:", e.message);
   }
 };
