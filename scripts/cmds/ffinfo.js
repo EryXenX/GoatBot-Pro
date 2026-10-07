@@ -1,11 +1,13 @@
 const axios = require("axios");
 
+const FF_API = "https://eryxenx.agi.bd/api/ffinfo";
+
 module.exports = {
   config: {
     name: "ffinfo",
     aliases: ["freefireinfo", "ffstats"],
-    version: "2.1.0",
-    author: "Dipto ✚ Edit by Mᴏʜᴀᴍᴍᴀᴅ Aᴋᴀsʜ",
+    version: "2.4.0",
+    author: "EryXenX",
     role: 0,
     premium: false,
     description: "Show complete Free Fire player info with styled output",
@@ -31,8 +33,10 @@ module.exports = {
         event.threadID
       );
 
-      const url = `https://ff.mlbbai.com/info/?uid=${uid}`;
-      const res = await axios.get(url);
+      const res = await axios.get(FF_API, {
+        params: { uid, region: args[1] || undefined },
+        timeout: 90000
+      });
       const data = res.data;
 
       if (!data || !data.basicInfo) {
@@ -49,76 +53,74 @@ module.exports = {
       const credit = data.creditScoreInfo || {};
       const cap = data.captainBasicInfo || {};
 
+      const fmtDate = (ts) =>
+        ts ? new Date(ts * 1000).toLocaleDateString("en-GB") : "N/A";
+      const enumName = (v, prefix) =>
+        v === null || v === undefined ? "N/A" : String(v).replace(prefix, "");
+      const sig = social.signature || b.signature || "";
+
       const msg = `
-🎮 𝐅ʀᴇᴇ 𝐅ɪʀᴇ 𝐏ʟᴀʏᴇʀ 𝐈ɴꜰᴏ
+🎮 Free Fire Player Info
 ━━━━━━━━━━━━━━━━━━
-👤 𝐍ᴀᴍᴇ: ${b.nickname || "N/A"}
-🆔 𝐔ɪᴅ: ${b.accountId || uid}
-🌍 𝐑ᴇɢɪᴏɴ: ${b.region || "N/A"}
-⭐ 𝐋ᴇᴠᴇʟ: ${b.level || "N/A"}
-❤️ 𝐋ɪᴋᴇꜱ: ${b.liked || 0}
-📈 𝐄xᴘ: ${b.exp || 0}
+👤 Name: ${b.nickname || "N/A"}
+🆔 UID: ${b.accountId || uid}
+🌍 Region: ${b.region || "N/A"}
+⭐ Level: ${b.level ?? "N/A"}
+❤️ Likes: ${b.liked ?? 0}
+📈 Exp: ${b.exp ?? 0}
 
-🏆 𝐑ᴀɴᴋ: ${b.rank || "N/A"}
-🎯 𝐑ᴀɴᴋ 𝐏ᴏɪɴᴛꜱ: ${b.rankingPoints || 0}
-⚔️ 𝐂ꜱ 𝐑ᴀɴᴋ: ${b.csRank || "N/A"}
-🎮 𝐂ꜱ 𝐏ᴏɪɴᴛꜱ: ${b.csRankingPoints || 0}
+🏆 Rank: ${b.rank ?? "N/A"}
+🎯 Rank Points: ${b.rankingPoints ?? 0}
+⚔️ CS Rank: ${b.csRank ?? "N/A"}
+🎮 CS Points: ${b.csRankingPoints ?? 0}
 
-👑 𝐌ᴀx 𝐑ᴀɴᴋ: ${b.maxRank || "N/A"}
-👑 𝐌ᴀx 𝐂ꜱ 𝐑ᴀɴᴋ: ${b.csMaxRank || "N/A"}
-🎟️ 𝐄ʟɪᴛᴇ 𝐏ᴀꜱꜱ: ${b.hasElitePass ? "✅ Yes" : "❌ No"}
-🏅 𝐁ᴀᴅɢᴇꜱ: ${b.badgeCnt || 0}
+👑 Max Rank: ${b.maxRank ?? "N/A"}
+👑 Max CS Rank: ${b.csMaxRank ?? "N/A"}
+🎟️ Elite Pass: ${b.hasElitePass ? "✅ Yes" : "❌ No"}
+🏅 Badges: ${b.badgeCnt ?? 0}
 
-📅 𝐒ᴇᴀꜱᴏɴ: ${b.seasonId || "N/A"}
-🛠️ 𝐑ᴇʟᴇᴀꜱᴇ: ${b.releaseVersion || "N/A"}
-👁️ 𝐁ʀ 𝐑ᴀɴᴋ 𝐒ʜᴏᴡ: ${b.showBrRank ? "Yes" : "No"}
-👁️ 𝐂ꜱ 𝐑ᴀɴᴋ 𝐒ʜᴏᴡ: ${b.showCsRank ? "Yes" : "No"}
-⏳ 𝐀ᴄᴄᴏᴜɴᴛ 𝐂ʀᴇᴀᴛᴇ: ${new Date(b.createAt * 1000).toLocaleDateString("en-GB")}
+📅 Season: ${b.seasonId ?? "N/A"}
+🛠️ Release: ${b.releaseVersion || "N/A"}
+👁️ BR Rank Show: ${b.showBrRank ? "Yes" : "No"}
+👁️ CS Rank Show: ${b.showCsRank ? "Yes" : "No"}
+⏳ Account Created: ${fmtDate(b.createAt)}
+🕒 Last Login: ${fmtDate(b.lastLoginAt)}
 
-🛡️ 𝐆ᴜɪʟᴅ 𝐈ɴꜰᴏ
+🛡️ Guild Info
 ━━━━━━━━━━━━━━━━
-🏷️ 𝐆ᴜɪʟᴅ 𝐍ᴀᴍᴇ: ${clan.clanName || "None"}
-🆔 𝐆ᴜɪʟᴅ 𝐈ᴅ: ${clan.clanId || "N/A"}
-📊 𝐆ᴜɪʟᴅ 𝐋ᴇᴠᴇʟ: ${clan.clanLevel || "N/A"}
-👥 𝐌ᴇᴍʙᴇʀꜱ: ${clan.memberNum || 0}/${clan.capacity || 0}
-👑 𝐆ᴜɪʟᴅ 𝐋ᴇᴀᴅᴇʀ: ${cap.nickname || "N/A"} (Lv.${cap.level || "?"})
+🏷️ Guild Name: ${clan.clanName || "None"}
+🆔 Guild ID: ${clan.clanId ?? "N/A"}
+📊 Guild Level: ${clan.clanLevel ?? "N/A"}
+👥 Members: ${clan.memberNum || 0}/${clan.capacity || 0}
+👑 Guild Leader: ${cap.nickname || "N/A"} (Lv.${cap.level ?? "?"})
 
-🐾 𝐏ᴇᴛ 𝐈ɴꜰᴏ
+🐾 Pet Info
 ━━━━━━━━━━━━━━━━
-🐶 𝐍ᴀᴍᴇ: ${pet.name || "None"}
-📈 𝐋ᴇᴠᴇʟ: ${pet.level || "N/A"}
-⭐ 𝐄xᴘ: ${pet.exp || 0}
-🎨 𝐒ᴋɪɴ 𝐈ᴅ: ${pet.skinId || "N/A"}
+🐶 Name: ${pet.name || "None"}
+📈 Level: ${pet.level ?? "N/A"}
+⭐ Exp: ${pet.exp ?? 0}
+🎨 Skin ID: ${pet.skinId ?? "N/A"}
 
-🌐 𝐒ᴏᴄɪᴀʟ 𝐈ɴꜰᴏ
+🌐 Social Info
 ━━━━━━━━━━━━━━━━
-🚻 𝐆ᴇɴᴅᴇʀ: ${social.gender?.replace("Gender_", "") || "N/A"}
-🗣️ 𝐋ᴀɴɢᴜᴀɢᴇ: ${social.language?.replace("Language_", "") || "N/A"}
-✍️ 𝐒ɪɢɴᴀᴛᴜʀᴇ:
-${social.signature
-  ? social.signature.replace(/\[B]|\[C]|\[ff[0-9a-f]+]/g, "")
-  : "None"}
+🚻 Gender: ${enumName(social.gender, "Gender_")}
+🗣️ Language: ${enumName(social.language, "Language_")}
+✍️ Signature:
+${sig ? sig.replace(/\[B]|\[C]|\[ff[0-9a-f]+]/gi, "") : "None"}
 
-🛡️ 𝐂ʀᴇᴅɪᴛ 𝐒ᴄᴏʀᴇ
+🛡️ Credit Score
 ━━━━━━━━━━━━━━━━
-💯 𝐒ᴄᴏʀᴇ: ${credit.creditScore || "N/A"}
-🎁 𝐑ᴇᴡᴀʀᴅ: ${credit.rewardState?.replace("REWARD_STATE_", "") || "N/A"}
-📆 𝐏ᴇʀɪᴏᴅ 𝐄ɴᴅ: ${
-        credit.periodicSummaryEndTime
-          ? new Date(credit.periodicSummaryEndTime * 1000).toLocaleDateString("en-GB")
-          : "N/A"
-      }
+💯 Score: ${credit.creditScore ?? "N/A"}
+🎁 Reward: ${enumName(credit.rewardState, "REWARD_STATE_")}
+📆 Period End: ${fmtDate(credit.periodicSummaryEndTime)}
 
-✨ Powered by 𝐌ᴏʜᴀᴍᴍᴀᴅ Aᴋᴀsʜ
+✨ Powered by EryXenX
 `;
 
       await api.editMessage(msg, wait.messageID);
     } catch (err) {
-      api.sendMessage(
-        `❌ Error: ${err.message}`,
-        event.threadID,
-        event.messageID
-      );
+      const reason = err.response?.data?.error || err.message;
+      api.sendMessage(`❌ Error: ${reason}`, event.threadID, event.messageID);
     }
   }
 };
