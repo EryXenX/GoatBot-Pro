@@ -13,24 +13,11 @@ const bigText = `
 ╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚═╝╚═════╝░╚═╝░░╚═╝
 `;
 
-function header(title) {
-	return chalk.cyanBright(
-`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                 ${title}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
-	);
-}
-
-function line(text) {
-	return chalk.hex("#ffd369")(text);
-}
-
 module.exports = async function (api, createLine) {
 
 	// HEADER
 	console.log(chalk.green(bigText));
-	console.log(header("🚀 GOATBOT DATABASE"));
-	console.log(line("📦 Loading system resources…"));
+	log.info('DATABASE', "Loading system resources…");
 
 	const controller = await require(path.join(__dirname, '..', '..', 'database/controller/index.js'))(api);
 	const { threadModel, userModel, dashBoardModel, globalModel, threadsData, usersData, dashBoardData, globalData, sequelize } = controller;
@@ -61,7 +48,7 @@ module.exports = async function (api, createLine) {
 
 	if (api && global.GoatBot.config.database.autoSyncWhenStart == true && shouldAutoSync) {
 
-		console.log(header("🔄 AUTO SYNC ENABLED"));
+		log.info('DATABASE', "Auto sync enabled — refreshing thread data");
 
 		const spin = createOraDots(getText('loadData', 'refreshingThreadData'));
 
@@ -106,7 +93,6 @@ module.exports = async function (api, createLine) {
 
 			spin._stop();
 			log.info('DATABASE', getText('loadData', 'refreshThreadDataSuccess', global.db.allThreadData.length));
-			console.log(chalk.green("✅ Auto Sync Complete!"));
 			try {
 				fs.writeJsonSync(lastAutoSyncPath, { lastAutoSyncAt: Date.now() }, { spaces: 2 });
 			} catch {}
@@ -125,7 +111,7 @@ module.exports = async function (api, createLine) {
 		log.info('DATABASE', `Auto sync skipped — last ran ${Math.round((Date.now() - lastAutoSyncAt) / 60000)}m ago (min interval 6h)`);
 	}
 
-	console.log(header("💻 SYSTEM READY"));
+	log.info('DATABASE', "System ready");
 
 	if (api && typeof api._connectE2EEAndMerge === "function" && global.GoatBot.config.e2ee?.enable !== false) {
 		await api._connectE2EEAndMerge();

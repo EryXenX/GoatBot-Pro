@@ -27,8 +27,8 @@ async function getApiBase() {
       _apiBaseFetchedAt = now;
       return _apiBase;
     }
-  } catch (err) {
-    console.error("[goatstore] failed to fetch store API URL:", err.message);
+  } catch (_) {
+    // Remote base-URL lookup is best-effort: fall through to the hardcoded base.
   }
   if (!_apiBase) _apiBase = HARD_FALLBACK_BASE;
   _apiBaseFetchedAt = now;
@@ -41,7 +41,6 @@ async function storeGet(pathSuffix, config) {
     return await axios.get(`${primaryBase}${pathSuffix}`, config);
   } catch (err) {
     if (primaryBase === HARD_FALLBACK_BASE) throw err;
-    console.error(`[goatstore] primary API failed (${primaryBase}), retrying via backup: ${HARD_FALLBACK_BASE}`);
     return await axios.get(`${HARD_FALLBACK_BASE}${pathSuffix}`, config);
   }
 }
@@ -52,7 +51,6 @@ async function storePost(pathSuffix, data, config) {
     return await axios.post(`${primaryBase}${pathSuffix}`, data, config);
   } catch (err) {
     if (primaryBase === HARD_FALLBACK_BASE) throw err;
-    console.error(`[goatstore] primary API failed (${primaryBase}), retrying via backup: ${HARD_FALLBACK_BASE}`);
     return await axios.post(`${HARD_FALLBACK_BASE}${pathSuffix}`, data, config);
   }
 }
@@ -440,6 +438,11 @@ async function getTrending(limit = 5) {
 }
 
 async function runAutoSync() {
+  const log = global.utils?.log || {
+    info: (tag, msg) => console.log(`[${tag}] ${msg}`),
+    warn: (tag, msg) => console.warn(`[${tag}] ${msg}`)
+  };
+  let uploaded = 0, updated = 0, skipped = 0, failed = 0, consecutiveErrors = 0;
   const folders = [
     { dir: getCmdsDir(), kind: "command" },
     { dir: getEventsDir(), kind: "event" }
@@ -462,10 +465,7 @@ async function runAutoSync() {
 
       try { new Function(content); } catch (_) { continue; }
       const fw = detectFramework(content);
-      if (fw !== "goat") {
-        console.log(`[goatstore-sync] Skipped ${file}: detected as "${fw}" (only GoatBot files are synced).`);
-        continue;
-      }
+      if (fw !== "goat") continue;
 
       try {
         const author = content.match(/author\s*:\s*["'`](.*?)["'`]/)?.[1]
@@ -475,16 +475,21 @@ async function runAutoSync() {
         const stampedContent = await stampUploadCode(content);
         const res = await storePost(`/miraistore/upload`, { rawCode: stampedContent, framework: "goat", kind, author, category });
         if (res.data?.error) {
-          console.error(`[goatstore-sync] Upload skipped for ${file}: ${res.data.message || res.data.error}`);
+          skipped++;
         } else if (res.data?.updated) {
-          console.log(`[goatstore-sync] ${file}: updated existing entry (ID: ${res.data.id}) to v${res.data.version}.`);
+          updated++;
           cache[cacheKey] = hash;
         } else {
-          console.log(`[goatstore-sync] ${file}: uploaded as new entry (ID: ${res.data.id}).`);
+          uploaded++;
           cache[cacheKey] = hash;
         }
+        consecutiveErrors = 0;
       } catch (err) {
-        console.error(`[goatstore-sync] Upload request fail for ${file}:`, err.response?.data?.error || err.message);
+        failed++;
+        if (++consecutiveErrors >= 5) {
+          saveSyncCache(cache);
+          return log.warn("GOATSTORE", `AutoSync stopped: store API unreachable (${err.response?.data?.error || err.message})`);
+        }
       }
 
       await new Promise(r => setTimeout(r, 500));
@@ -492,6 +497,8 @@ async function runAutoSync() {
   }
 
   saveSyncCache(cache);
+  if (uploaded || updated || failed || skipped)
+    log.info("GOATSTORE", `AutoSync done — ${uploaded} uploaded, ${updated} updated, ${skipped} skipped, ${failed} failed`);
 }
 
 const buildBar = pct => "█".repeat(Math.floor(pct / 10)) + "░".repeat(10 - Math.floor(pct / 10));

@@ -1,4 +1,4 @@
-process.stdout.write("]2;EryXenX 🌐 Ultra Edition\\");
+process.stdout.write("\x1b]2;EryXenX Ultra Edition\x07");
 function decode(_0x3eea0c) {
   _0x3eea0c = Buffer.from(_0x3eea0c, 'hex').toString('utf-8');
   _0x3eea0c = Buffer.from(_0x3eea0c, "hex").toString('utf-8');
@@ -101,17 +101,23 @@ for (const t of subTitleArray) {
 centerText(gradient('#9F98E8', "#AFF6CF")("Created by NTKhang with ♡"), "Created by NTKhang with ♡".length);
 centerText(gradient('#9F98E8', '#AFF6CF')("Source code: https://github.com/ntkhang03/Goat-Bot-V2"), "Source code: https://github.com/ntkhang03/Goat-Bot-V2".length);
 centerText(gradient("#f5af19", '#f12711')("ALL VERSIONS NOT RELEASED HERE ARE FAKE"), "ALL VERSIONS NOT RELEASED HERE ARE FAKE".length);
-let widthConsole = process.stdout.columns;
+// process.stdout.columns is undefined when output is piped to a file, which
+// made every banner separator collapse to a single character. These are plain
+// functions so they are hoisted and safe to call from createLine() above.
+function consoleColumns() {
+  return process.stdout.columns || 0x32;
+}
+let widthConsole = consoleColumns();
 if (widthConsole > 0x32) {
   widthConsole = 0x32;
 }
 function createLine(_0x5e1f50, _0x5cc2b7 = false) {
   if (!_0x5e1f50) {
-    return Array(_0x5cc2b7 ? process.stdout.columns : widthConsole).fill('─').join('');
+    return Array(_0x5cc2b7 ? consoleColumns() : widthConsole).fill('─').join('');
   } else {
     _0x5e1f50 = " " + _0x5e1f50.trim() + " ";
     const _0x200e0c = _0x5e1f50.length;
-    const _0x128791 = _0x5cc2b7 ? process.stdout.columns - _0x200e0c : widthConsole - _0x200e0c;
+    const _0x128791 = (_0x5cc2b7 ? consoleColumns() : widthConsole) - _0x200e0c;
     let _0x512638 = Math.floor(_0x128791 / 0x2);
     if (_0x512638 < 0x0 || isNaN(_0x512638)) {
       _0x512638 = 0x0;
@@ -555,12 +561,12 @@ async function startBot(_0x3cad9e) {
   }
   log.info("LOGIN FACEBOOK", getText("login", "currentlyLogged"));
   const fcaVersion = (() => { try { return JSON.parse(require("fs").readFileSync(require.resolve("@eryxenx/fca").replace(/index\.js$/, "package.json"), "utf8")).version; } catch { return "unknown"; } })();
-  log.warn("FCA", `Modified By Mohammad Akash 😈 | @eryxenx/fca v${fcaVersion}`);
+  log.info("FCA", `@eryxenx/fca v${fcaVersion}`);
   try {
     var _0x41cca2 = path.join(process.cwd(), "account.txt");
     var _0x11ae53 = fs.readFileSync(_0x41cca2, 'utf8');
     var _0x372cb5 = JSON.parse(_0x11ae53);
-    log.warn("APPSTATE", "Appstate Verified Successfully.");
+    log.success("APPSTATE", "Appstate Verified Successfully.");
   } catch {
     return log.warn('APPSTATE', "Appstate Cookie Not Found.");
   }
@@ -609,7 +615,7 @@ async function startBot(_0x3cad9e) {
       // connection on the same bridge and can race with the listener that
       // @eryxenx/fca already wired into api.listenMqtt. Nothing to do here.
       if (_0x4d5048.e2ee && typeof _0x4d5048.e2ee.isConnected === "function") {
-        log.info("E2EE", _0x4d5048.e2ee.isConnected() ? "Signal Protocol connected ✅" : "Not connected yet (non-fatal)");
+        log.info("E2EE", _0x4d5048.e2ee.isConnected() ? "Signal Protocol connected" : "Not connected yet (non-fatal)");
       }
 
       let _0x70f374 = false;
@@ -755,7 +761,6 @@ async function startBot(_0x3cad9e) {
         });
       }
       if (global.GoatBot.config.dashBoard?.['enable'] == true && dashBoardIsRunning == false) {
-        logColor("#f5ab00", createLine("DASHBOARD"));
         try {
           await require('../../dashboard/app.js')(_0x4d5048);
           log.info("DASHBOARD", getText("login", "openDashboardSuccess"));
@@ -766,7 +771,7 @@ async function startBot(_0x3cad9e) {
       }
       logColor("#f5ab00", character);
       let _0x472e79 = 0x0;
-      const _0x5a9173 = global.GoatBot.config.adminBot.filter(_0x47eecf => !isNaN(_0x47eecf)).map(_0x303660 => _0x303660 = _0x303660.toString());
+      const _0x5a9173 = global.GoatBot.config.adminBot.map(_0x47eecf => String(_0x47eecf == null ? "" : _0x47eecf).trim()).filter(_0x47eecf => _0x47eecf !== "" && !isNaN(_0x47eecf));
       for (const _0x4db515 of _0x5a9173) {
         try {
           const _0x4c8959 = await _0x84ef91.getName(_0x4db515);
@@ -778,8 +783,8 @@ async function startBot(_0x3cad9e) {
       log.master("NOTIFICATION", (_0x4d48d2 || '').trim());
       log.master("SUCCESS", getText("login", "runBot"));
       log.master("LOAD TIME", '' + convertTime(Date.now() - global.GoatBot.startTime));
-      logColor('#f5ab00', createLine("COPYRIGHT"));
-      console.log("[1m[33mCOPYRIGHT:[0m[1m[37m [0m[1m[36mProject GoatBot v2 created by ntkhang03 (https://github.com/ntkhang03), please do not sell this source code or claim it as your own. Thank you![0m");
+      logColor('#f5ab00', createLine());
+      console.log("\x1b[1;33mCOPYRIGHT:\x1b[0m \x1b[1;36mProject GoatBot v2 created by ntkhang03 (https://github.com/ntkhang03), please do not sell this source code or claim it as your own. Thank you!\x1b[0m");
       logColor("#f5ab00", character);
       global.GoatBot.config.adminBot = _0x5a9173;
       writeFileSync(global.client.dirConfig, JSON.stringify(global.GoatBot.config, null, 0x2));

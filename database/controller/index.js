@@ -33,6 +33,7 @@ module.exports = async function (api) {
 		case "mongodb": {
 			const spin = ora({
 				text: getText('indexController', 'connectingMongoDB'),
+				isSilent: !process.stderr.isTTY,
 				spinner: {
 					interval: 80,
 					frames: [
@@ -63,6 +64,7 @@ module.exports = async function (api) {
 		case "sqlite": {
 			const spin = ora({
 				text: getText('indexController', 'connectingMySQL'),
+				isSilent: !process.stderr.isTTY,
 				spinner: {
 					interval: 80,
 					frames: [

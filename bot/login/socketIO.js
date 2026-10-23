@@ -11,11 +11,13 @@ module.exports = async (server) => {
 	const { channelName, verifyToken } = config.serverUptime.socket;
 	let io;
 
+	// socket.io is optional: it only makes sense when a client has a shared
+	// verify token to authenticate with. An empty token means "not set up",
+	// so skip it quietly instead of reporting a fatal-looking error.
+	if (!channelName || !verifyToken)
+		return log.warn("SOCKET IO", `Skipped: "channelName" and "verifyToken" must be set in config.serverUptime.socket`);
+
 	try {
-		if (!channelName)
-			throw ('"channelName" is not defined in config');
-		if (!verifyToken)
-			throw ('"verifyToken" is not defined in config');
 		io = new Server(server);
 		log.info("SOCKET IO", getText("socketIO", "connected"));
 	}

@@ -10,14 +10,14 @@ const dim = s => esc("90", s);
 const bold = s => esc("1", s);
 const TAG_WIDTH = 16;
 
-// white text on a colored background, fixed width so every line lines up
-const badge = (label, bg) => `\x1b[1;97;${bg}m ${label.padEnd(5)} \x1b[0m`;
+// `[ OK ]` / `[ ERROR ]` badges, padded to a fixed width so every line lines up
+const badge = (label, color) => `\x1b[1;${color}m${`[ ${label} ]`.padEnd(9)}\x1b[0m`;
 const BADGES = {
-	info: badge("INFO", 44),
-	success: badge("OK", 42),
-	warn: badge("WARN", 43),
-	error: badge("ERROR", 41),
-	master: badge("BOT", 45)
+	info: badge("INFO", 96),
+	success: badge("OK", 92),
+	warn: badge("WARN", 93),
+	error: badge("ERROR", 91),
+	master: badge("BOT", 95)
 };
 
 const time = () => dim(moment().tz(TZ).format("HH:mm:ss"));

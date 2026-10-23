@@ -13,10 +13,7 @@ const regExpCheckPackage = /require(\s+|)\((\s+|)[`'"]([^`'"]+)[`'"](\s+|)\)/g;
 const packageAlready = [];
 
 const hackerLog = () => {
-	console.log("[+] Loading commands...");
-	console.log("[+] Loading events...");
-	console.log("[✓] All modules loaded successfully.");
-	console.log("> System ready...");
+	log.info("LOADER", "Loading commands and events...");
 };
 
 module.exports = async function (api, threadModel, userModel, dashBoardModel, globalModel, threadsData, usersData, dashBoardData, globalData, createLine) {
@@ -85,13 +82,13 @@ module.exports = async function (api, threadModel, userModel, dashBoardModel, gl
 							packageAlready.push(packageName);
 
 							if (!existsSync(`${process.cwd()}/node_modules/${packageName}`)) {
-								console.log(`[+] Installing package: ${packageName}`);
+								log.info("LOADED", `Installing missing package: ${packageName}`);
 								try {
 									await exec(`npm install ${packageName}`);
-									console.log(`[✓] Installed: ${packageName}`);
+									log.success("LOADED", `Installed package: ${packageName}`);
 								}
 								catch {
-									console.log(`[✖] Failed installing ${packageName}`);
+									log.err("LOADED", `Failed to install package: ${packageName}`);
 									throw new Error(`Can't install package ${packageName}`);
 								}
 							}
@@ -155,10 +152,8 @@ module.exports = async function (api, threadModel, userModel, dashBoardModel, gl
 			}
 		}
 
-		if (commandError.length > 0) {
-			log.err("LOADED", `Error loading some ${text}s`);
+		if (commandError.length > 0)
 			for (const item of commandError)
-				console.log(` ✖ ${item.name}: ${item.error.message}`);
-		}
+				log.err("LOADED", `Failed to load ${text} ${item.name}`, item.error);
 	}
 };

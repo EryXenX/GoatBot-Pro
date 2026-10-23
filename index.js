@@ -21,10 +21,11 @@ const { spawn } = require("child_process");
 const log = require("./logger/log.js");
 
 function startProject() {
-	const child = spawn("node", ["EryXenX.js"], {
+	// No `shell: true`: passing an args array through a shell is deprecated
+	// (DEP0190) and the arguments would not be escaped.
+	const child = spawn(process.execPath, ["EryXenX.js"], {
 		cwd: __dirname,
-		stdio: "inherit",
-		shell: true
+		stdio: "inherit"
 	});
 
 	child.on("close", (code) => {
@@ -44,6 +45,14 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Uptime server running on port ${PORT}`);
+const uptimeServer = app.listen(PORT, '0.0.0.0', () => {
+  log.info("UPTIME", `Uptime server running on port ${PORT}`);
+});
+// A busy port is not fatal: the bot itself does not need this keep-alive
+// endpoint, so report it once instead of crashing the process.
+uptimeServer.on("error", (err) => {
+  if (err.code === "EADDRINUSE")
+    log.warn("UPTIME", `Port ${PORT} is already in use — uptime server disabled`);
+  else
+    log.err("UPTIME", "Uptime server error", err);
 });

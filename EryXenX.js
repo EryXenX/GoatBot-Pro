@@ -17,8 +17,18 @@
  * Cảm ơn bạn đã sử dụng
  */
 
-process.on('unhandledRejection', error => console.log(error));
-process.on('uncaughtException', error => console.log(error));
+// Route crashes through the structured logger so they render with the same
+// `[ ERROR ]` badge as everything else instead of a bare console dump.
+process.on('unhandledRejection', error => {
+        const log = global.utils?.log;
+        if (log) log.err("UNHANDLED", "Unhandled promise rejection", error);
+        else console.error(error);
+});
+process.on('uncaughtException', error => {
+        const log = global.utils?.log;
+        if (log) log.err("UNCAUGHT", "Uncaught exception", error);
+        else console.error(error);
+});
 
 const axios = require("axios");
 const fs = require("fs-extra");

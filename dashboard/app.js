@@ -63,8 +63,10 @@ module.exports = async (api) => {
 		// config ships a blank one).
 		accessToken = null;
 	}
+	// Optional feature: a blank or expired refresh token in the shipped
+	// config is normal, so report it as a notice instead of bare console noise.
 	if (!accessToken)
-		console.log("DASHBOARD: gmail OAuth unavailable — email verification codes will not be sent");
+		utils.log.info("DASHBOARD", "Gmail OAuth not configured — email verification codes are disabled");
 
 	const transporter = accessToken ? nodemailer.createTransport({
 		host: "smtp.gmail.com",
