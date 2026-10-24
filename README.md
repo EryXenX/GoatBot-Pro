@@ -279,11 +279,27 @@ only connects once, at login).
 ## ◈ Command Anti-Spam (Humanizer)
 
 Every command reply goes through `@eryxenx/fca`'s built-in humanizer —
-the bot waits a short, randomized delay (2-3s by default) before replying
-to a command, shows the typing indicator for exactly that window, and
-enforces a per-thread cooldown so command spam gets dropped instead of
-flooding replies. Plain chat (non-commands) is untouched — no delay, no
-typing.
+the bot waits a delay before replying to a command, shows the typing
+indicator for exactly that window, and enforces a per-thread cooldown so
+command spam gets dropped instead of flooding replies. Plain chat
+(non-commands) is untouched — no delay, no typing.
+
+The delay is set from `config.json`, so you can make replies faster or
+slower (or turn the delay off entirely) without touching the code:
+
+```json
+"humanizer": {
+  "enable": true,      // false = reply instantly, no delay, no typing
+  "delayMs": 3000,     // how long to wait (and show typing) before replying
+  "cooldownMs": 5500,  // min gap between two accepted commands, per thread
+  "maxPerMinute": 20   // global cap on accepted commands
+}
+```
+
+`delayMs` also accepts a range, e.g. `[2000, 4000]`, for a random delay.
+The typing indicator always lasts exactly the delay, so the two never
+drift apart. Change it live from chat with `{prefix}setting` →
+Bot Behavior → Typing Indicator, or edit `config.json` and restart.
 
 This applies automatically to:
 - normal prefixed commands (`/help`, etc.)

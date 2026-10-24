@@ -15,8 +15,14 @@
   "nickNameBot": "𝙃𝙞𝙣𝙖𝙏'𝙖 𝙐𝙯𝙪𝙢𝙖𝙆'𝙞𝙞 ᯓᡣ𐭩",
   "prefix": "/",
   "enableTypingIndicator": true,
-  "typingDuration": 2000,
-  "notesTypingIndicator": "true = show 'is typing...' before every reply (more human-like, adds visible delay) | false = reply instantly, no typing shown",
+  "notesTypingIndicator": "true = show 'is typing...' for the humanizer delay before replying | false = reply instantly, no typing shown",
+  "humanizer": {
+    "enable": true,
+    "delayMs": 3000,
+    "cooldownMs": 5500,
+    "maxPerMinute": 20,
+    "notes": "delayMs = how long the bot waits (and shows typing) before replying to a command. cooldownMs = min gap between two accepted commands per thread. maxPerMinute = global accepted-command cap. Set enable=false to reply instantly with no delay."
+  },
   "noPrefix": {
     "enable": true,
     "notes": "true = only bot admins can use commands without prefix | false = everyone must use prefix"

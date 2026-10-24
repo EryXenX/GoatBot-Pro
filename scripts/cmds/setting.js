@@ -180,6 +180,18 @@ const CATEGORIES = [
 	}
 ];
 
+function renderReplyDelayMenu(config) {
+	const h = config.humanizer || {};
+	const delay = Array.isArray(h.delayMs) ? h.delayMs.join("-") : (h.delayMs ?? 3000);
+	const lines = [
+		`1. ${"Typing Indicator"} — ${status(config.enableTypingIndicator)}`,
+		`2. ${"Reply Delay"} — ${status(h.enable)}`,
+		`3. ${"Delay"} — ${delay}ms`,
+		`4. ${"Cooldown"} — ${h.cooldownMs ?? 5500}ms`
+	];
+	return renderBox("⌛", "Reply Delay (Humanizer)", ["Typing lasts exactly the delay"], "fields", lines, "Reply 1-4 · 0 to go back");
+}
+
 function renderCategoryList() {
 	const itemLines = CATEGORIES.map((cat, i) => `${i + 1}. ${cat.title.replace(/^[^\w]*/, "").trim()}`);
 	return renderBox("⚙️", "Bot Settings", [`Categories : ${CATEGORIES.length}`, "Author : EryXenX"], "categories", itemLines, `Reply 1-${CATEGORIES.length} to enter a category`);
@@ -226,6 +238,32 @@ module.exports = {
 
 		function saveConfig() {
 			fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf8");
+		}
+
+		function applyLiveHumanizer() {
+			// `config` here is a fresh read of the file, so mirror the two keys the
+			// running bot reads onto global.GoatBot.config or the next listener
+			// restart would revert the change.
+			try {
+				if (global.GoatBot.config) {
+					global.GoatBot.config.humanizer = config.humanizer;
+					global.GoatBot.config.enableTypingIndicator = config.enableTypingIndicator;
+				}
+				const fcaApi = global.GoatBot.fcaApi;
+				const h = fcaApi && typeof fcaApi.getHumanizer === "function" ? fcaApi.getHumanizer() : null;
+				if (h && typeof h.setOptions === "function") {
+					if (config.humanizer.enable === false) h.setOptions({ enabled: false });
+					else {
+						h.setOptions({
+							enabled: true,
+							reactDelayMs: config.humanizer.delayMs,
+							cooldownMs: config.humanizer.cooldownMs,
+							maxPerMinute: config.humanizer.maxPerMinute
+						});
+						h.enabled = true;
+					}
+				}
+			} catch { }
 		}
 
 		async function sendAndListen(text, newState, extra = {}) {
@@ -345,13 +383,7 @@ module.exports = {
 				return await sendAndListen(menu, "nickname");
 			}
 			if (num === 8) return await sendAndListen(renderBoolGroupMenu(config, "fcaOptions"), "fcaOptions");
-			if (num === 9) {
-				const menu = renderBox("⚙️", "Typing Indicator", [], "fields", [
-					`1. ${"Toggle"} — ${status(config.enableTypingIndicator)}`,
-					`2. ${"Duration"} — ${config.typingDuration || 2000}ms`
-				], "Reply 1-2");
-				return await sendAndListen(menu, "typingIndicator");
-			}
+			if (num === 9) return await sendAndListen(renderReplyDelayMenu(config), "typingIndicator");
 			if (num === 10) {
 				const db = config.database || {};
 				const menu = renderBox("🗄️", "Database", [], "fields", [
@@ -724,18 +756,39 @@ module.exports = {
 		}
 
 		if (state === "typingIndicator") {
+			if (num === 0) return backToCategories();
+			config.humanizer = config.humanizer || {};
 			if (num === 1) {
 				config.enableTypingIndicator = !config.enableTypingIndicator;
 				saveConfig();
-				return message.reply(`✦ Typing Indicator — ${status(config.enableTypingIndicator)}`);
+				applyLiveHumanizer();
+				return await sendAndListen(renderReplyDelayMenu(config), "typingIndicator");
 			}
-			if (num === 2) return await sendAndListen("› Reply with duration in milliseconds (e.g. 2000 for 2s):", "typingDurationSet");
+			if (num === 2) {
+				config.humanizer.enable = !config.humanizer.enable;
+				saveConfig();
+				applyLiveHumanizer();
+				return await sendAndListen(renderReplyDelayMenu(config), "typingIndicator");
+			}
+			if (num === 3) return await sendAndListen("› Reply with the delay in milliseconds (e.g. 3000 for 3s):", "humanizerDelaySet");
+			if (num === 4) return await sendAndListen("› Reply with the cooldown in milliseconds (min gap between two commands):", "humanizerCooldownSet");
+			return await sendAndListen(renderReplyDelayMenu(config), "typingIndicator");
 		}
-		if (state === "typingDurationSet") {
-			if (isNaN(num) || num < 500 || num > 15000) return message.reply("𝗫 Invalid duration. Use a value between 500 and 15000 ms.");
-			config.typingDuration = num;
+		if (state === "humanizerDelaySet") {
+			if (isNaN(num) || num < 0 || num > 60000) return await sendAndListen("𝗫 Invalid delay. Use a value between 0 and 60000 ms.\n› Reply with the delay in milliseconds:", "humanizerDelaySet");
+			config.humanizer = config.humanizer || {};
+			config.humanizer.delayMs = num;
 			saveConfig();
-			return message.reply(`✦ Typing Duration set to: ${num}ms`);
+			applyLiveHumanizer();
+			return await sendAndListen(renderReplyDelayMenu(config), "typingIndicator");
+		}
+		if (state === "humanizerCooldownSet") {
+			if (isNaN(num) || num < 0 || num > 600000) return await sendAndListen("𝗫 Invalid cooldown. Use a value between 0 and 600000 ms.\n› Reply with the cooldown in milliseconds:", "humanizerCooldownSet");
+			config.humanizer = config.humanizer || {};
+			config.humanizer.cooldownMs = num;
+			saveConfig();
+			applyLiveHumanizer();
+			return await sendAndListen(renderReplyDelayMenu(config), "typingIndicator");
 		}
 
 		if (state === "database") {

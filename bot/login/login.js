@@ -44,6 +44,7 @@ const {
 } = require("fs-extra");
 const handlerWhenListenHasError = require("./handlerWhenListenHasError.js");
 const checkLiveCookie = require("./checkLiveCookie.js");
+const { buildHumanizeOptions, applyHumanizerToApi } = require("./humanizerOptions.js");
 const {
   callbackListenTime,
   storage5Message
@@ -587,7 +588,9 @@ async function startBot(_0x3cad9e) {
     let _0x54729a = false;
     login({
       'appState': _0x812929
-    }, global.GoatBot.config.optionsFca, async function (_0x3f689f, _0x4d5048) {
+    }, Object.assign({}, global.GoatBot.config.optionsFca, {
+      humanize: buildHumanizeOptions(global.GoatBot.config)
+    }), async function (_0x3f689f, _0x4d5048) {
       if (_0x3f689f) {
         log.err("LOGIN FACEBOOK", "Login failed:", _0x3f689f);
         process.exit(1);
@@ -909,6 +912,9 @@ async function startBot(_0x3cad9e) {
       await stopListening();
       global.GoatBot.Listening = _0x4d5048.listenMqtt(_0xb703d8());
       global.GoatBot.callBackListen = _0x290401;
+      // The humanizer instance is created inside listenMqtt, so sync the
+      // current config onto it now (and after every listener restart below).
+      applyHumanizerToApi(_0x4d5048, global.GoatBot.config);
       if (global.GoatBot.config.serverUptime.enable == true && !global.GoatBot.config.dashBoard?.['enable'] && !global.serverUptimeRunning) {
         const _0x155439 = require("http");
         const _0x14ff60 = require('express');
@@ -951,6 +957,7 @@ async function startBot(_0x3cad9e) {
             await stopListening();
             await sleep(0x3e8);
             global.GoatBot.Listening = _0x4d5048.listenMqtt(_0xb703d8());
+            applyHumanizerToApi(_0x4d5048, global.GoatBot.config);
             log.info('LISTEN_MQTT', getText('login', 'restartListenMessage2'));
           } catch (_0x5e1259) {
             log.err('LISTEN_MQTT', getText('login', "restartListenMessageError"), _0x5e1259);

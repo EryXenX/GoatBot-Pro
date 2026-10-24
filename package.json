@@ -1,6 +1,6 @@
 {
   "name": "goatbot-pro",
-  "version": "7.0.0",
+  "version": "7.1.0",
   "description": "Enhanced Facebook Messenger bot framework, forked and modified by EryXenX from Goat Bot V2 (originally by NTKhang).",
   "main": "index.js",
   "engines": {
