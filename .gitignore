@@ -1,0 +1,11 @@
+node_modules/
+.env
+
+# Runtime state: the bot writes live session cookies and caches here.
+account.txt
+account.txt.bak
+Fca_Database/
+goatstore_dircache.json
+goatstore_sync_cache.json
+scripts/cmds/cache/*.json
+database/data/*.sqlite-journal
