@@ -4,7 +4,7 @@ module.exports = {
 	config: {
 		name: "pinterest",
 		aliases: ["pin"],
-		version: "1.0.4",
+		version: "1.0.5",
 		author: "EryXenX",
 		countDown: 10,
 		role: 0,
@@ -14,7 +14,7 @@ module.exports = {
 		},
 		guide: {
 			en: "   {pn} <query> — search and show the first page"
-				+ "\n   {pn} <query> -n<number> — pics per page (1-10, default 10)"
+				+ "\n   {pn} <query> -n<number> — pics per page (1-10, default 6)"
 				+ "\n   Then react to the result for the next page, or reply \"n\" / a page number."
 		}
 	},
@@ -168,7 +168,7 @@ async function buildAttachments(results) {
 
 function buildBody(results, hasMore, withImageLinks) {
 	const footer = hasMore
-		? 'Reply "n" for the next page, or a page number to jump.'
+		? 'React or reply "n" for the next page, or reply a page number to jump.'
 		: "That is the last page.";
 
 	if (!withImageLinks)
