@@ -97,7 +97,7 @@ module.exports = {
 };
 
 const API_BASE = "https://eryxenx.agi.bd/api";
-const DEFAULT_LIMIT = 10;
+const DEFAULT_LIMIT = 6;
 const MAX_LIMIT = 10;
 const FETCH_SIZE = 25;
 const TIMEOUT = 30000;
