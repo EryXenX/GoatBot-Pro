@@ -4,7 +4,7 @@ module.exports = {
 	config: {
 		name: "pinterest",
 		aliases: ["pin"],
-		version: "1.0.3",
+		version: "1.0.4",
 		author: "EryXenX",
 		countDown: 10,
 		role: 0,
