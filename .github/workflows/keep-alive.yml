@@ -1,0 +1,41 @@
+name: Keep Alive
+
+# External keep-alive for free hosts that spin a web service down after a
+# period of inactivity (Render's free tier stops a service after ~15 minutes
+# without inbound traffic). This pings the service from GitHub's
+# infrastructure, which counts as real external traffic and complements the
+# in-app keep-alive in keepAlive.js.
+#
+# Setup: create a repository variable (Settings > Secrets and variables >
+# Actions > Variables) named RENDER_URL holding your service URL, e.g.
+# https://your-service.onrender.com. A secret with the same name also works.
+#
+# Note: GitHub may delay scheduled runs under load and disables schedules in a
+# public repository after 60 days without repository activity. The in-app
+# keep-alive is the primary mechanism; this workflow is a safety net.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping service health endpoint
+        env:
+          TARGET_URL: ${{ vars.RENDER_URL || secrets.RENDER_URL }}
+        run: |
+          if [ -z "$TARGET_URL" ]; then
+            echo "RENDER_URL is not set - skipping keep-alive ping."
+            exit 0
+          fi
+          url="${TARGET_URL%/}/health"
+          echo "Pinging $url"
+          code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 60 --retry 2 --retry-delay 5 "$url")
+          echo "HTTP $code"
+          case "$code" in
+            2*|3*) exit 0 ;;
+            *) echo "Keep-alive ping failed"; exit 1 ;;
+          esac
