@@ -117,53 +117,10 @@ On Railway, just connect the repo and it builds/runs the same way. On a
 VPS, run it directly or under a process manager (`pm2 start index.js`,
 `screen`, `tmux`, etc.) so it stays alive after you disconnect.
 
-### 4. Keep the bot awake on Render (free tier)
-
-Render's free tier stops a web service after about **15 minutes without
-inbound traffic**, so the bot goes offline unless something keeps pinging
-it. This project includes a built-in keep-alive so you don't need
-UptimeRobot or any other external monitor.
-
-How it works:
-
-- `index.js` starts a small HTTP server (`/health`) on Render's `PORT`.
-- `keepAlive.js` pings the service's own **public** URL every 10 minutes,
-  which resets Render's idle timer. (A request to `localhost` would not
-  count — it has to go out to the public address.)
-- The public URL is auto-detected from `RENDER_EXTERNAL_URL` on Render, so
-  nothing is required to enable it there.
-
-Deploy on Render:
-
-1. Create a **Web Service** from this repo (Render detects Node.js).
-2. Build command: `npm install` — Start command: `npm start`.
-3. (Recommended) Set `NODE_ENV=production`.
-4. (Recommended) Paste your cookies into `account.txt` **or** set the
-   `facebookAccount` credentials in `config.json`. Render's filesystem is
-   ephemeral, so anything you write by hand is lost on redeploy.
-
-Optional settings in `config.json`:
-
-```json
-"keepAlive": {
-  "enable": true,
-  "interval": 10,
-  "url": "",
-  "path": "/health"
-}
-```
-
-- `interval` — minutes between pings. Keep it under 15.
-- `url` — leave empty to auto-detect (`RENDER_EXTERNAL_URL`). Set it to
-  your public address on other hosts, or leave empty on a VPS to disable.
-- `enable` — set to `false` to turn the keep-alive off.
-
-The in-app keep-alive is all you need — no external monitor such as
-UptimeRobot is required.
-
-> ⚠️ Keeping a free service awake around the clock consumes your workspace's
-> 750 monthly free instance hours (a month is ~720 hours), so run only one
-> free service this way. On Render, a paid instance avoids the sleep entirely.
+**Render — does not work.** Render's platform is not compatible with how
+this bot runs (persistent MQTT/WebSocket connection + filesystem writes
+for session/appstate). Don't deploy this on Render — use Railway or a VPS
+instead.
 
 ---
 
