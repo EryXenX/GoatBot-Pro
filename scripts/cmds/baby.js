@@ -35,7 +35,7 @@ function getBotUID(api) {
 
 module.exports.config = {
   name: "baby",
-  version: "8.0.0",
+  version: "8.0.1",
   role: 0,
   author: "EryXenX",
   countTime: 0,
@@ -284,22 +284,42 @@ const greetingReplies = [
   "Tumar dak sunle onno kicu mone thake na 🙈"
 ];
 
+function sendMessageAsync(api, text, threadID, replyToID) {
+  return new Promise((resolve, reject) => {
+    const cb = (err, info) => (err ? reject(err) : resolve(info));
+    if (replyToID) {
+      api.sendMessage(text, threadID, cb, replyToID);
+    } else {
+      api.sendMessage(text, threadID, cb);
+    }
+  });
+}
+
 async function sendGreeting(api, event) {
   const reply = greetingReplies[Math.floor(Math.random() * greetingReplies.length)];
 
   await sendTypingIndicatorV2(api, true, event.threadID);
-  await new Promise(r => setTimeout(r, 5000));
+  await new Promise(r => setTimeout(r, 2000));
   await sendTypingIndicatorV2(api, false, event.threadID);
 
-  return api.sendMessage(reply, event.threadID, (err, info) => {
-    if (!err) {
-      global.GoatBot.onReply.set(info.messageID, {
-        commandName: module.exports.config.name,
-        messageID: info.messageID,
-        author: event.senderID,
-        type: "simsimi"
-      });
+  let info;
+  try {
+    info = await sendMessageAsync(api, reply, event.threadID, event.messageID);
+  } catch (e) {
+    console.log("❌ greeting reply error:", JSON.stringify(e));
+    try {
+      info = await sendMessageAsync(api, reply, event.threadID);
+    } catch (e2) {
+      console.log("❌ greeting failed after retry:", JSON.stringify(e2));
+      return;
     }
+  }
+
+  global.GoatBot.onReply.set(info.messageID, {
+    commandName: module.exports.config.name,
+    messageID: info.messageID,
+    author: event.senderID,
+    type: "simsimi"
   });
 }
 
@@ -310,17 +330,6 @@ function withTimeout(promise, ms, label) {
       setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
     )
   ]);
-}
-
-function sendMessageAsync(api, text, threadID, replyToID) {
-  return new Promise((resolve, reject) => {
-    const cb = (err, info) => (err ? reject(err) : resolve(info));
-    if (replyToID) {
-      api.sendMessage(text, threadID, cb, replyToID);
-    } else {
-      api.sendMessage(text, threadID, cb);
-    }
-  });
 }
 
 async function deliverSimsimiResponse({ api, event, query, senderName }) {
