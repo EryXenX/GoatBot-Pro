@@ -107,6 +107,13 @@
     "url": "",
     "notes": "Time in seconds. Recommended for uptime monitors."
   },
+  "keepAlive": {
+    "enable": true,
+    "interval": 10,
+    "url": "",
+    "path": "/health",
+    "notes": "Prevents free hosts (Render) from spinning the service down by pinging its own public URL. interval is in minutes (keep below 15). Leave url empty to auto-detect RENDER_EXTERNAL_URL / RENDER_EXTERNAL_HOSTNAME; on a VPS set url to your public address or leave it empty to disable."
+  },
   "autoLoadScripts": {
     "enable": false,
     "ignoreCmds": "",

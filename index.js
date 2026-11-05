@@ -44,6 +44,16 @@ app.get('/', (req, res) => {
   res.send('Bot is running!');
 });
 
+// Lightweight liveness endpoint. Keep-alive pings and uptime monitors should
+// hit this instead of '/' so they stay cheap and never touch the bot state.
+const healthPayload = (req, res) => res.status(200).json({
+  status: "ok",
+  uptime: process.uptime(),
+  timestamp: Date.now()
+});
+app.get('/health', healthPayload);
+app.get('/uptime', healthPayload);
+
 const PORT = process.env.PORT || 3000;
 const uptimeServer = app.listen(PORT, '0.0.0.0', () => {
   log.info("UPTIME", `Uptime server running on port ${PORT}`);
@@ -56,3 +66,20 @@ uptimeServer.on("error", (err) => {
   else
     log.err("UPTIME", "Uptime server error", err);
 });
+
+// Built-in keep-alive: prevents free hosts (Render) from spinning the service
+// down. Runs in this parent process so it survives child restarts.
+try {
+  const configDir = ["production", "development"].includes(process.env.NODE_ENV)
+    ? "./config.dev.json"
+    : "./config.json";
+  const keepAlive = require("./keepAlive.js");
+  const keepAliveConfig = { ...require(configDir).keepAlive };
+  if (keepAliveConfig.enable !== false) {
+    // Wait for the HTTP server to accept connections before the first ping.
+    uptimeServer.on("listening", () => keepAlive.start(keepAliveConfig, log));
+  }
+}
+catch (err) {
+  log.err("KEEP ALIVE", "Could not start keep-alive", err);
+}
