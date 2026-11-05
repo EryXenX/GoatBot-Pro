@@ -158,10 +158,8 @@ Optional settings in `config.json`:
   your public address on other hosts, or leave empty on a VPS to disable.
 - `enable` — set to `false` to turn the keep-alive off.
 
-There is also an optional external safety net at
-`.github/workflows/keep-alive.yml`. Add a repository variable named
-`RENDER_URL` (Settings → Secrets and variables → Actions → Variables) with
-your service URL, and GitHub Actions will ping it every 10 minutes too.
+The in-app keep-alive is all you need — no external monitor such as
+UptimeRobot is required.
 
 > ⚠️ Keeping a free service awake around the clock consumes your workspace's
 > 750 monthly free instance hours (a month is ~720 hours), so run only one
