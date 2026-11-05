@@ -73,7 +73,7 @@ try {
   const configDir = ["production", "development"].includes(process.env.NODE_ENV)
     ? "./config.dev.json"
     : "./config.json";
-  const keepAlive = require("./keepAlive.js");
+  const keepAlive = require("./bot/keepAlive.js");
   const keepAliveConfig = { ...require(configDir).keepAlive };
   if (keepAliveConfig.enable !== false) {
     // Wait for the HTTP server to accept connections before the first ping.
