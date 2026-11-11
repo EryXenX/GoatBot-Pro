@@ -1,201 +1,130 @@
-// code from goatstore
-// api: https://store.agi.bd
 const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 
-const API_URL_JSON = "https://raw.githubusercontent.com/abdullahrx07/X-api/main/MaRiA/baseApiUrl.json";
-const HARD_FALLBACK_BASE = "https://store.agi.bd";
-function envOverride() {
+const DEBUG = /^(1|true|yes|on)$/i.test(String(process.env.GOATSTORE_DEBUG || "").trim());
+function log(...args) { if (DEBUG) console.log(...args); }
+function logError(...args) { if (DEBUG) console.error(...args); }
+
+module.exports = {
+  config: {
+    name: "goatstore",
+    aliases: ["gs", "cmdstore", "commandstore"],
+    version: "20.3.2",
+    author: "rX",
+    countDown: 15,
+    role: 2,
+    shortDescription: "GoatBot Store — Search, AutoUpdate, Install, Upload, AutoSync",
+    longDescription: "Browse, install, upload, and autosync GoatBot commands and events from the MiraiStore API. Auto-detects your cmds/events folder naming. The bare-menu shows only the daily-use commands — every subcommand lives here in the guide.",
+    category: "system",
+    guide: {
+      en:
+        "{pn} — Menu / Notifications\n" +
+        "{pn} <id | file name> — Search commands only\n" +
+        "{pn} -a <name> — All files by an author\n" +
+        "{pn} -c <goat|mirai|other|category> — Browse a framework or category\n" +
+        "{pn} -e <name> — Search events\n" +
+        "{pn} -e install <id> — Install as event\n" +
+        "{pn} -e upload <fileName> — Upload an event file\n" +
+        "{pn} n — Today's updates\n" +
+        "{pn} list [page] — Command list\n" +
+        "{pn} list event [page] — Event list\n" +
+        "{pn} install <id> — Install a command\n" +
+        "{pn} like <id> — Like\n" +
+        "{pn} trend — Trending\n" +
+        "{pn} upload <fileName> — Upload a command file\n" +
+        "{pn} sync — Manual sync\n" +
+        "{pn} dirs — Show & re-detect cmds/events locations\n" +
+        "Reply \"in\" to a single result — Install\n" +
+        "Reply \"in <id>\" to a list result — Install"
+    },
+    autoSync: true
+  }
+};
+
+const PRIMARY_BASE = (() => {
   const v = process.env.STORE_API_BASE;
-  return v && v.startsWith("http") ? v.replace(/\/$/, "") : null;
-}
-let _apiBase = null;
-let _apiBaseFetchedAt = 0;
-const API_BASE_TTL_MS = 5 * 60 * 1000;
-
-async function getApiBase() {
-  const override = envOverride();
-  if (override) return override;
-  const now = Date.now();
-  if (_apiBase && now - _apiBaseFetchedAt < API_BASE_TTL_MS) return _apiBase;
-  try {
-    const res = await axios.get(API_URL_JSON, { timeout: 8000 });
-    const store = res.data && (res.data.store || res.data.Store);
-    if (store && typeof store === "string" && store.startsWith("http")) {
-      _apiBase = store.replace(/\/$/, "");
-      _apiBaseFetchedAt = now;
-      return _apiBase;
-    }
-  } catch (_) {
-    // Remote base-URL lookup is best-effort: fall through to the hardcoded base.
-  }
-  if (!_apiBase) _apiBase = HARD_FALLBACK_BASE;
-  _apiBaseFetchedAt = now;
-  return _apiBase;
-}
-
-async function storeGet(pathSuffix, config) {
-  const primaryBase = await getApiBase();
-  try {
-    return await axios.get(`${primaryBase}${pathSuffix}`, config);
-  } catch (err) {
-    if (primaryBase === HARD_FALLBACK_BASE) throw err;
-    return await axios.get(`${HARD_FALLBACK_BASE}${pathSuffix}`, config);
-  }
-}
-
-async function storePost(pathSuffix, data, config) {
-  const primaryBase = await getApiBase();
-  try {
-    return await axios.post(`${primaryBase}${pathSuffix}`, data, config);
-  } catch (err) {
-    if (primaryBase === HARD_FALLBACK_BASE) throw err;
-    return await axios.post(`${HARD_FALLBACK_BASE}${pathSuffix}`, data, config);
-  }
-}
-
-const premium = (function () {
-
-  let state = { adminUid: null, premiumUsers: [], premiumCommands: [], premiumAuthors: [] };
-  let _lastRefresh = 0;
-  const REFRESH_INTERVAL = 1000 * 60 * 5;
-  let _refreshing = null;
-
-  function normUid(uid) { return String(uid == null ? "" : uid).trim(); }
-  function normName(s) { return String(s == null ? "" : s).trim().toLowerCase(); }
-
-  function refresh(force = false) {
-    if (!force && Date.now() - _lastRefresh < REFRESH_INTERVAL) return Promise.resolve(state);
-    if (_refreshing) return _refreshing;
-    _refreshing = (async () => {
-      try {
-        const res = await storeGet(`/miraistore/premium`);
-        if (res.data && !res.data.error) {
-          state = {
-            adminUid: res.data.adminUid || state.adminUid || null,
-            premiumUsers: res.data.premiumUsers || [],
-            premiumCommands: res.data.premiumCommands || [],
-            premiumAuthors: res.data.premiumAuthors || []
-          };
-          _lastRefresh = Date.now();
-        }
-      } catch (_) {
-      } finally {
-        _refreshing = null;
-      }
-      return state;
-    })();
-    return _refreshing;
-  }
-
-  function isAdmin(senderId) { return !!state.adminUid && normUid(senderId) === state.adminUid; }
-
-  function isPremiumUser(senderId) { return state.premiumUsers.some(u => normUid(u) === normUid(senderId)); }
-
-  function isPremiumAuthor(author) { return state.premiumAuthors.some(a => normName(a) === normName(author)); }
-
-  function isPremiumCmd(cmdName, author) {
-    if (cmdName) {
-      if (state.premiumCommands.some(c => normName(c) === normName(cmdName))) return true;
-    }
-    return isPremiumAuthor(author);
-  }
-
-  function isPremiumViewer(senderId) { return isAdmin(senderId) || isPremiumUser(senderId); }
-
-  function isFiltered(cmdName, author, senderId) { return isPremiumCmd(cmdName, author) && !isPremiumViewer(senderId); }
-  function canExecutePremium(senderId) { return isAdmin(senderId) || isPremiumUser(senderId); }
-  function isAdminViewer(senderId) { return isAdmin(senderId); }
-
-  async function mutate(action, value, senderId) {
-    try {
-      const res = await storePost(`/miraistore/premium`, { senderId, action, value });
-      const data = res.data || {};
-      if (Array.isArray(data.premiumUsers)) {
-        state = {
-          adminUid: data.adminUid || state.adminUid || null,
-          premiumUsers: data.premiumUsers,
-          premiumCommands: data.premiumCommands || [],
-          premiumAuthors: data.premiumAuthors || []
-        };
-        _lastRefresh = Date.now();
-      }
-      if (data.error) return { ok: false, error: data.error };
-      return { ok: data.ok !== false };
-    } catch (e) {
-      return { ok: false, error: e.response?.data?.error || "Premium API error." };
-    }
-  }
-
-  async function addPremiumUser(uid, senderId) {
-    const u = normUid(uid);
-    if (!u) return { ok: false, error: "UID required" };
-    if (isAdmin(u)) return { ok: false, error: "Admin is already premium by default" };
-    return mutate("addUser", u, senderId);
-  }
-
-  async function removePremiumUser(uid, senderId) {
-    const u = normUid(uid);
-    if (!u) return { ok: false, error: "UID required" };
-    return mutate("removeUser", u, senderId);
-  }
-
-  async function addPremiumCmd(cmdName, senderId) {
-    const n = normName(cmdName);
-    if (!n) return { ok: false, error: "Command name required" };
-    return mutate("addCommand", n, senderId);
-  }
-
-  async function removePremiumCmd(cmdName, senderId) {
-    const n = normName(cmdName);
-    if (!n) return { ok: false, error: "Command name required" };
-    return mutate("removeCommand", n, senderId);
-  }
-
-  async function addPremiumAuthor(author, senderId) {
-    const a = normName(author);
-    if (!a) return { ok: false, error: "Author name required" };
-    return mutate("addAuthor", a, senderId);
-  }
-
-  async function removePremiumAuthor(author, senderId) {
-    const a = normName(author);
-    if (!a) return { ok: false, error: "Author name required" };
-    return mutate("removeAuthor", a, senderId);
-  }
-
-  function listPremium() {
-    return {
-      adminUid: state.adminUid,
-      premiumUsers: [...state.premiumUsers],
-      premiumCommands: [...state.premiumCommands],
-      premiumAuthors: [...state.premiumAuthors]
-    };
-  }
-
-  refresh(true);
-
-  return {
-    isAdmin,
-    isPremiumUser,
-    isPremiumAuthor,
-    isPremiumCmd,
-    isPremiumViewer,
-    canExecutePremium,
-    isFiltered,
-    isAdminViewer,
-    addPremiumUser,
-    removePremiumUser,
-    addPremiumCmd,
-    removePremiumCmd,
-    addPremiumAuthor,
-    removePremiumAuthor,
-    listPremium,
-    refresh
-  };
+  return v && v.startsWith("http") ? v.replace(/\/$/, "") : "https://rx.agi.bd";
 })();
+const BACKUP_BASE = "https://xyr.is-a.dev";
 
+function shouldFailover(err) {
+  return !err.response || err.response.status >= 500;
+}
+
+const REQ_WINDOW_MS = 10 * 1000;
+const REQ_MAX_PER_WINDOW = 12;
+const REQ_MIN_GAP_MS = 150;
+
+const BOT_FP = `bot:${module.exports.config.author || "goatstore"}`;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const _reqTimes = [];
+let _reqChain = Promise.resolve();
+
+function _schedule(makeReq) {
+  const run = _reqChain.then(async () => {
+    for (;;) {
+      const now = Date.now();
+      while (_reqTimes.length && now - _reqTimes[0] >= REQ_WINDOW_MS) _reqTimes.shift();
+      if (_reqTimes.length >= REQ_MAX_PER_WINDOW) {
+        await sleep(REQ_WINDOW_MS - (now - _reqTimes[0]) + 10);
+        continue;
+      }
+      const last = _reqTimes[_reqTimes.length - 1] || 0;
+      if (now - last < REQ_MIN_GAP_MS) { await sleep(REQ_MIN_GAP_MS - (now - last)); continue; }
+      break;
+    }
+    _reqTimes.push(Date.now());
+    return makeReq();
+  });
+  _reqChain = run.then(() => {}, () => {});
+  return run;
+}
+
+function blockedMs(err) {
+  const s = Number(err?.response?.data?.remainingSeconds);
+  return Number.isFinite(s) && s > 0 ? s * 1000 : 0;
+}
+
+async function _send(makeReq, attempt = 0) {
+  try {
+    return await _schedule(makeReq);
+  } catch (err) {
+    const wait = blockedMs(err);
+    if (wait > 0 && attempt < 2) {
+      const ms = Math.min(wait, 5 * 60 * 1000) + 500;
+      logError(`[goatstore] store rate limit hit — waiting ${Math.ceil(ms / 1000)}s before retrying`);
+      await sleep(ms);
+      return _send(makeReq, attempt + 1);
+    }
+    throw err;
+  }
+}
+
+async function storeGet(pathSuffix, config = {}) {
+  const cfg = { ...config, params: { ...(config.params || {}) } };
+  if (!cfg.params.clientFp && !/clientFp=/.test(pathSuffix)) cfg.params.clientFp = BOT_FP;
+  try {
+    return await _send(() => axios.get(`${PRIMARY_BASE}${pathSuffix}`, cfg));
+  } catch (err) {
+    if (!shouldFailover(err)) throw err;
+    logError(`[goatstore] ${PRIMARY_BASE} failed, retrying via ${BACKUP_BASE}`);
+    return await _send(() => axios.get(`${BACKUP_BASE}${pathSuffix}`, cfg));
+  }
+}
+
+async function storePost(pathSuffix, data, config = {}) {
+  const body = { ...(data || {}) };
+  if (!body.clientFp) body.clientFp = BOT_FP;
+  try {
+    return await _send(() => axios.post(`${PRIMARY_BASE}${pathSuffix}`, body, config));
+  } catch (err) {
+    if (!shouldFailover(err)) throw err;
+    logError(`[goatstore] ${PRIMARY_BASE} failed, retrying via ${BACKUP_BASE}`);
+    return await _send(() => axios.post(`${BACKUP_BASE}${pathSuffix}`, body, config));
+  }
+}
 
 async function checkAbuseGuard(senderID) {
   try {
@@ -225,6 +154,20 @@ const UPDATE_CHECK_INTERVAL = 1000 * 60 * 30;
 
 const MAX_EDITS_PER_MESSAGE = 5;
 
+function isBotAdmin(uid) {
+  try {
+    const cfg = global.GoatBot?.config || {};
+    const list = [...(cfg.adminBot || []), ...(cfg.superAdminBot || [])].map(String);
+    return list.includes(String(uid));
+  } catch (_) { return false; }
+}
+
+function safeFileName(name, fallback) {
+  const base = path.basename(String(name || "").replace(/\s+/g, "_")).replace(/[^A-Za-z0-9_.-]/g, "");
+  const clean = base.replace(/\.js$/i, "").replace(/^\.+/, "");
+  return (clean || fallback) + ".js";
+}
+
 function getPrefix(threadData) {
   try {
     if (threadData?.data?.prefix) return threadData.data.prefix;
@@ -246,8 +189,7 @@ function saveSyncCache(cache) {
 let _autoupdateInFlight = false;
 
 async function stampUploadCode(code) {
-  const apiBase = await getApiBase();
-  return `// code from goatstore\n// api: ${apiBase}\n${code}`;
+  return `// code from goatstore\n// api: ${PRIMARY_BASE}\n${code}`;
 }
 
 function hashContent(content) {
@@ -308,7 +250,6 @@ function detectFramework(code) {
 
   return "other";
 }
-
 
 const EVENTS_NAME_PATTERNS = ["events", "event"];
 const SCAN_SKIP_DIRS = new Set(["node_modules", ".git", ".cache", ".github", "dist", "build"]);
@@ -394,14 +335,11 @@ function fileNotFoundMsg(fileName, dirs, prefix) {
 
 async function checkSelfUpdate() {
   const now = Date.now();
-  if (_updateCheckCache && (now - _updateCheckCache.checkedAt) < UPDATE_CHECK_INTERVAL)
-    return _updateCheckCache.result;
   try {
     const res = await storeGet(`/miraistore/search?q=goatstore&limit=10&framework=goat&kind=command`);
     const cmds = Array.isArray(res.data?.commands) ? res.data.commands : [];
     const match =
-      cmds.find(c => c.name?.toLowerCase() === "goatstore" && c.author === module.exports.config.author) ||
-      cmds.find(c => c.name?.toLowerCase() === "goatstore");
+      cmds.find(c => c.name?.toLowerCase() === "goatstore" && c.author === module.exports.config.author);
     if (!match) { _updateCheckCache = { checkedAt: now, result: null }; return null; }
     const current = module.exports.config.version;
     const latest = match.version || "N/A";
@@ -423,7 +361,6 @@ async function getTodayUpdates(senderID = null) {
     const today = new Date().toDateString();
     return (res.data.commands || [])
       .filter(cmd => new Date(cmd.uploadDate).toDateString() === today)
-      .filter(cmd => premium.isPremiumViewer(senderID) || !premium.isPremiumCmd(cmd.name, cmd.author));
   } catch (_) { return []; }
 }
 
@@ -437,12 +374,33 @@ async function getTrending(limit = 5) {
   return null;
 }
 
+const SYNC_MAX_PER_MINUTE = 2;
+const SYNC_WINDOW_MS = 60 * 1000;
+const _syncTimes = [];
+let _syncRunning = false;
+
+async function waitSyncSlot() {
+  for (;;) {
+    const now = Date.now();
+    while (_syncTimes.length && now - _syncTimes[0] >= SYNC_WINDOW_MS) _syncTimes.shift();
+    if (_syncTimes.length < SYNC_MAX_PER_MINUTE) break;
+    await sleep(SYNC_WINDOW_MS - (now - _syncTimes[0]) + 200);
+  }
+  _syncTimes.push(Date.now());
+}
+
 async function runAutoSync() {
-  const log = global.utils?.log || {
-    info: (tag, msg) => console.log(`[${tag}] ${msg}`),
-    warn: (tag, msg) => console.warn(`[${tag}] ${msg}`)
-  };
-  let uploaded = 0, updated = 0, skipped = 0, failed = 0, consecutiveErrors = 0;
+  if (_syncRunning) return false;
+  _syncRunning = true;
+  try {
+    await doAutoSync();
+    return true;
+  } finally {
+    _syncRunning = false;
+  }
+}
+
+async function doAutoSync() {
   const folders = [
     { dir: getCmdsDir(), kind: "command" },
     { dir: getEventsDir(), kind: "event" }
@@ -465,7 +423,10 @@ async function runAutoSync() {
 
       try { new Function(content); } catch (_) { continue; }
       const fw = detectFramework(content);
-      if (fw !== "goat") continue;
+      if (fw !== "goat") {
+        log(`[goatstore-sync] Skipped ${file}: detected as "${fw}" (only GoatBot files are synced).`);
+        continue;
+      }
 
       try {
         const author = content.match(/author\s*:\s*["'`](.*?)["'`]/)?.[1]
@@ -473,32 +434,30 @@ async function runAutoSync() {
                     || "Unknown";
         const category = content.match(/category\s*:\s*["'`](.*?)["'`]/)?.[1] || "Uncategorized";
         const stampedContent = await stampUploadCode(content);
+        await waitSyncSlot();
         const res = await storePost(`/miraistore/upload`, { rawCode: stampedContent, framework: "goat", kind, author, category });
         if (res.data?.error) {
-          skipped++;
+          logError(`[goatstore-sync] Upload skipped for ${file}: ${res.data.message || res.data.error}`);
+          if (["Already exists", "Version already exists", "Version too low", "Upload blocked", "Not allowed"].includes(res.data.error))
+            cache[cacheKey] = hash;
         } else if (res.data?.updated) {
-          updated++;
+          log(`[goatstore-sync] ${file}: updated existing entry (ID: ${res.data.id}) to v${res.data.version}.`);
           cache[cacheKey] = hash;
         } else {
-          uploaded++;
+          log(`[goatstore-sync] ${file}: uploaded as new entry (ID: ${res.data.id}).`);
           cache[cacheKey] = hash;
         }
-        consecutiveErrors = 0;
       } catch (err) {
-        failed++;
-        if (++consecutiveErrors >= 5) {
-          saveSyncCache(cache);
-          return log.warn("GOATSTORE", `AutoSync stopped: store API unreachable (${err.response?.data?.error || err.message})`);
-        }
+        logError(`[goatstore-sync] Upload request fail for ${file}:`, err.response?.data?.error || err.message);
       }
+
+      saveSyncCache(cache);
 
       await new Promise(r => setTimeout(r, 500));
     }
   }
 
   saveSyncCache(cache);
-  if (uploaded || updated || failed || skipped)
-    log.info("GOATSTORE", `AutoSync done — ${uploaded} uploaded, ${updated} updated, ${skipped} skipped, ${failed} failed`);
 }
 
 const buildBar = pct => "█".repeat(Math.floor(pct / 10)) + "░".repeat(10 - Math.floor(pct / 10));
@@ -551,7 +510,24 @@ function autoloadCommand(filePath) {
   }
 }
 
+const _installLocks = new Map();
+
 async function doInstall(api, threadID, senderID, id, forceKind = null) {
+  const key = `${threadID}:${id}`;
+  const now = Date.now();
+  const prev = _installLocks.get(key);
+  if (prev && now - prev < 8000) return;
+  _installLocks.set(key, now);
+  try {
+    return await installCommand(api, threadID, senderID, id, forceKind);
+  } finally {
+    setTimeout(() => {
+      if (_installLocks.get(key) === now) _installLocks.delete(key);
+    }, 8000).unref?.();
+  }
+}
+
+async function installCommand(api, threadID, senderID, id, forceKind = null) {
   let cmdData = null;
   try {
     const res = await storeGet(`/miraistore/search?q=${encodeURIComponent(id)}&clientFp=${encodeURIComponent(senderID || "")}`);
@@ -575,17 +551,18 @@ async function doInstall(api, threadID, senderID, id, forceKind = null) {
   try { new Function(cmdData.rawCode); }
   catch (err) { return api.sendMessage(`❌ Syntax error in remote code.\n${err.message}`, threadID); }
 
-  if (premium.isPremiumCmd(cmdData.name, cmdData.author)    && !premium.canExecutePremium(senderID, cmdData.name, cmdData.author))    return api.sendMessage("*This command is premium only*", threadID);
   const displayName = cmdData.name || `gs_${id}`;
   const isEvent = forceKind === "event" ? true : forceKind === "command" ? false : cmdData.kind === "event";
 
   let pid;
   try { pid = await animateInstall(api, threadID, displayName); } catch (_) {}
 
-  const fileName = displayName.replace(/\s+/g, "_") + ".js";
+  const fileName = safeFileName(displayName, `gs_${id}`);
   const baseDir = process.cwd();
   const installDir = isEvent ? getEventsDir() : getCmdsDir();
   const filePath = path.join(installDir, fileName);
+  if (path.dirname(path.resolve(filePath)) !== path.resolve(installDir))
+    return api.sendMessage("❌ Unsafe file name.", threadID);
   const locLabel = path.relative(baseDir, filePath);
 
   try {
@@ -679,8 +656,7 @@ function authorLine(cmd) {
 }
 
 function resultBlock(cmd) {
-  const isP = premium.isPremiumCmd(cmd.name, cmd.author);
-  const nameLine =isP ? `\u262F ${cmd.name}` : cmd.name;
+  const nameLine = cmd.name;
   return (
     `╭─‣ ${nameLine} 〄\n` +
     `├‣ ID : ${cmd.id}\n` +
@@ -694,8 +670,7 @@ function resultBlock(cmd) {
 }
 
 function listBlock(cmd) {
-  const isP = premium.isPremiumCmd(cmd.name, cmd.author);
-  const nameLine =isP ? `\u262F ${cmd.name}` : cmd.name;
+  const nameLine = cmd.name;
   return (
     `╭─‣ ${nameLine} 〄\n` +
     `├‣ ID : ${cmd.id}\n` +
@@ -718,7 +693,7 @@ async function sendListPage(api, threadID, senderID, kind, page, limit = 10, pre
     const totalPages = Math.ceil(data.total / limit);
     const label = kind === "event" ? "GoatBot Events" : "GoatBot Commands";
     let msg = `📂 ${label} — Page ${page}/${totalPages} (${data.total} total)\n\n`;
-        data.commands.forEach(cmd => { if (premium.isFiltered(cmd.name, cmd.author, senderID)) return; msg += listBlock(cmd); });
+        data.commands.forEach(cmd => { msg += listBlock(cmd); });
     if (totalPages > 1) msg += `⏤͟͟͞͞  Page ${page}/${totalPages}\n╭‣ React or reply p ${page + 1 <= totalPages ? page + 1 : page} for nxt pg\n`;
     msg += `╰‣ reply in <id> for install`;
 
@@ -761,7 +736,7 @@ async function sendSearchPage(api, threadID, senderID, query, page, limit = 5, p
     const title = searchTitle(query, filterOpts);
 
     let msg = `${title} (${total} found)\n\n`;
-    data.commands.forEach(cmd => { if (premium.isFiltered(cmd.name, cmd.author, senderID)) return; msg += resultBlock(cmd); });
+    data.commands.forEach(cmd => { msg += resultBlock(cmd); });
     if (totalPages > 1) msg += `⏤͟͟͞͞  Page ${page}/${totalPages}\n╭‣ React or reply p ${page + 1 <= totalPages ? page + 1 : page} for nxt pg\n`;
     msg += `╰‣ reply in <id> for install`;
 
@@ -789,7 +764,7 @@ async function renderListPageInto(messageID, kind, page, limit, senderID = null)
   const totalPages = Math.ceil(data.total / limit);
   const label = kind === "event" ? "GoatBot Events" : "GoatBot Commands";
   let msg = `📂 ${label} — Page ${page}/${totalPages} (${data.total} total)\n\n`;
-  data.commands.forEach(cmd => { if (premium.isFiltered(cmd.name, cmd.author, senderID)) return; msg += listBlock(cmd); });
+  data.commands.forEach(cmd => { msg += listBlock(cmd); });
   if (totalPages > 1) msg += `⏤͟͟͞͞  Page ${page}/${totalPages}\n╭‣ React or reply p ${page + 1 <= totalPages ? page + 1 : page} for nxt pg\n`;
   msg += `╰‣ reply in <id> for install`;
   return { text: msg.trim(), totalPages };
@@ -814,7 +789,7 @@ async function renderSearchPageInto(query, page, limit, filterOpts = {}, senderI
   const title = searchTitle(query, filterOpts);
 
   let msg = `${title} (${total} found)\n\n`;
-  data.commands.forEach(cmd => { if (premium.isFiltered(cmd.name, cmd.author, senderID)) return; msg += resultBlock(cmd); });
+  data.commands.forEach(cmd => { msg += resultBlock(cmd); });
   if (totalPages > 1) msg += `⏤͟͟͞͞  Page ${page}/${totalPages}\n╭‣ React or reply p ${page + 1 <= totalPages ? page + 1 : page} for nxt pg\n`;
   msg += `╰‣ reply in <id> for install`;
   return { text: msg.trim(), totalPages };
@@ -913,75 +888,32 @@ async function uploadFile(api, threadID, filePath, kind, senderID = null) {
   }
 }
 
-module.exports = {
-  config: {
-    name: "goatstore",
-    aliases: ["gs", "cmdstore", "commandstore"],
-    version: "19.10.0",
-    author: "rX",
-    countDown: 3,
-    role: 2,
-    shortDescription: "GoatBot Store — Search, AutoUpdate, Install, Upload, AutoSync",
-    longDescription: "Browse, install, upload, and autosync GoatBot commands and events from the MiraiStore API. Auto-detects your cmds/events folder naming. The bare-menu shows only the daily-use commands — every subcommand lives here in the guide.",
-    category: "system",
-    guide: {
-      en:
-        "{pn} — Menu / Notifications\n" +
-        "{pn} <id | file name> — Search commands only\n" +
-        "{pn} -a <name> — All files by an author\n" +
-        "{pn} -c <goat|mirai|other|category> — Browse a framework or category\n" +
-        "{pn} -e <name> — Search events\n" +
-        "{pn} -e install <id> — Install as event\n" +
-        "{pn} -e upload <fileName> — Upload an event file\n" +
-        "{pn} n — Today's updates\n" +
-        "{pn} list [page] — Command list\n" +
-        "{pn} list event [page] — Event list\n" +
-        "{pn} install <id> — Install a command\n" +
-        "{pn} like <id> — Like\n" +
-        "{pn} trend — Trending\n" +
-        "{pn} upload <fileName> — Upload a command file\n" +
-        "{pn} sync — Manual sync\n" +
-        "{pn} dirs — Show & re-detect cmds/events locations\n" +
-        "{pn} pr add <uid> — Add premium user (admin, or reply to a msg)\n" +
-        "{pn} pr remove <uid> — Remove premium user (admin)\n" +
-        "{pn} pr upload <cmdname> — Mark a command premium (admin)\n" +
-        "{pn} pr delete <cmdname> — Unmark a command (admin)\n" +
-        "{pn} pr author add|remove <authorname> — Premium by author (admin)\n" +
-        "{pn} pr list — Show premium state (admin)\n" +
-        "Reply \"in\" to a single result — Install\n" +
-        "Reply \"in <id>\" to a list result — Install"
-    },
-    autoSync: true
-  },
-
-  onLoad: function () {
-    setTimeout(() => {
-      premium.refresh(true).catch(() => {});
-      setInterval(() => { premium.refresh(true).catch(() => {}); }, 1000 * 60 * 5);
-    }, 5000);
-    setTimeout(() => {
-      maybeAutoUpdate(null, null).catch(() => {});
-      setInterval(() => { maybeAutoUpdate(null, null).catch(() => {}); }, UPDATE_CHECK_INTERVAL);
-    }, 6000);
+Object.assign(module.exports, {
+  onLoad: function ({ api } = {}) {
+    const jitter = (base, spread) => base + Math.floor(Math.random() * spread);
     if (module.exports.config.autoSync) {
       const ONE_DAY = 1000 * 60 * 60 * 24;
       setTimeout(() => {
         runAutoSync().catch(() => {});
         setInterval(() => { runAutoSync().catch(() => {}); }, ONE_DAY);
-      }, 8000);
+      }, jitter(9000, 30000));
     }
   },
 
   onReply: async function ({ api, event, Reply }) {
-    const { threadID, body, senderID } = event;
+    const { threadID, senderID } = event;
+    const body = event.body;
+    if (typeof body !== "string") return;
 
     const inIdMatch = body.match(/^in\s+(\d+)$/i);
     const inBareMatch = /^in$/i.test(body.trim());
+    if ((inIdMatch || inBareMatch) && !isBotAdmin(senderID)) return;
     if (inIdMatch) return doInstall(api, threadID, senderID, inIdMatch[1], null);
     if (inBareMatch && Reply?.singleId) return doInstall(api, threadID, senderID, Reply.singleId, null);
 
     const delMatch = body.match(/^(?:rmv|delete|remove)\s+(\S+)(?:\s+(\S+))?/i);
     if (delMatch) {
+      if (!isBotAdmin(senderID)) return;
       const [, delId, delSecret] = delMatch;
       try {
         const payload = delSecret ? { secret: delSecret, userID: senderID } : { userID: senderID };
@@ -993,7 +925,7 @@ module.exports = {
 
     const { mode, query, listType, authorQuery, framework, kind, category, page, totalPages, limit, senderID: origSender } = Reply;
     if (senderID !== origSender) return;
-    const match = body.match(/^page (\d+)$/i);
+    const match = body.trim().match(/^(?:p|page)\s*(\d+)$/i);
     if (!match) return;
     const newPage = parseInt(match[1]);
     if (newPage < 1 || newPage > totalPages)
@@ -1010,8 +942,10 @@ module.exports = {
     const text = body.trim();
 
     const inMatch  = text.match(/^in\s+(\d+)$/i);
+    const inBareMatch = /^in$/i.test(text);
     const rmvMatch = text.match(/^(?:rmv|remove)\s+(\d+)(?:\s+(\S+))?$/i);
-    if (!inMatch && !rmvMatch) return;
+    if (!inMatch && !inBareMatch && !rmvMatch) return;
+    if (!isBotAdmin(senderID)) return;
 
     let isBotMsg = false;
     try { isBotMsg = String(messageReply.senderID) === String(api.getCurrentUserID()); } catch (_) {}
@@ -1020,6 +954,12 @@ module.exports = {
     if (!/〄|🔍|📂|MiraiStore|GoatBot Store/i.test(repliedBody)) return;
 
     if (inMatch) return doInstall(api, threadID, senderID, inMatch[1], null);
+
+    if (inBareMatch) {
+      const pending = global.GoatBot.onReply.get(messageReply.messageID);
+      if (pending?.singleId) return doInstall(api, threadID, senderID, pending.singleId, null);
+      return;
+    }
 
     const [, id, secret] = rmvMatch;
     try {
@@ -1080,137 +1020,14 @@ module.exports = {
     const sub = args[0]?.toLowerCase() || null;
     const prefix = getPrefix(threadData || event?.threadData);
 
-
-
-    if (sub === "pr" || sub === "premium") {
-      if (!premium.isAdmin(senderID)) return api.sendMessage("*store admin only cmd*", threadID);
-
-      const pSub = args[1]?.toLowerCase() || null;
-      const resolveUid = () => {
-        if (args[2]) return args[2];
-        if (event.messageReply?.senderID) return event.messageReply.senderID;
-
-
-
-        return null;
-      };
-
-      if (pSub === "add") {
-        const uid = resolveUid();
-        if (!uid) return api.sendMessage(`❌ Usage: ${prefix}gs pr add <uid> (or reply to a message)`, threadID);
-        const r = await premium.addPremiumUser(uid, senderID);
-        return api.sendMessage(r.ok ? `✅ Premium user added: ${uid}` : `❌ ${r.error}`, threadID);
-      }
-
-      if (pSub === "remove" || pSub === "rm") {
-        const uid = resolveUid();
-        if (!uid) return api.sendMessage(`❌ Usage: ${prefix}gs pr remove <uid> (or reply to a message)`, threadID);
-        const r = await premium.removePremiumUser(uid, senderID);
-        return api.sendMessage(r.ok ? `✅ Premium user removed: ${uid}` : `❌ ${r.error}`, threadID);
-      }
-
-      if (pSub === "upload") {
-        const cmdName = args.slice(2).join(" ");
-        if (!cmdName) return api.sendMessage(`❌ Usage: ${prefix}gs pr upload <cmdname>`, threadID);
-        const r = await premium.addPremiumCmd(cmdName, senderID);
-        return api.sendMessage(r.ok ? `✅ "${cmdName}" is now a premium command` : `❌ ${r.error}`, threadID);
-      }
-
-      if (pSub === "delete" || pSub === "del") {
-        const cmdName = args.slice(2).join(" ");
-        if (!cmdName) return api.sendMessage(`❌ Usage: ${prefix}gs pr delete <cmdname>`, threadID);
-        const r = await premium.removePremiumCmd(cmdName, senderID);
-        return api.sendMessage(r.ok ? `✅ Premium status removed from "${cmdName}"` : `❌ ${r.error}`, threadID);
-      }
-
-      if (pSub === "author") {
-        const aSub = args[2]?.toLowerCase() || null;
-        const authorName = args.slice(3).join(" ");
-        if (aSub === "add") {
-          if (!authorName) return api.sendMessage(`❌ Usage: ${prefix}gs pr author add <authorname>`, threadID);
-          const r = await premium.addPremiumAuthor(authorName, senderID);
-          return api.sendMessage(r.ok ? `✅ All commands by "${authorName}" are now premium` : `❌ ${r.error}`, threadID);
-        }
-        if (aSub === "remove" || aSub === "rm") {
-          if (!authorName) return api.sendMessage(`❌ Usage: ${prefix}gs pr author remove <authorname>`, threadID);
-          const r = await premium.removePremiumAuthor(authorName, senderID);
-          return api.sendMessage(r.ok ? `✅ Premium status removed from author "${authorName}"` : `❌ ${r.error}`, threadID);
-        }
-        return api.sendMessage(`❌ Usage: ${prefix}gs pr author add|remove <authorname>`, threadID);
-      }
-
-      if (pSub === "list" || pSub === "ls") {
-        const s = premium.listPremium();
-        const fmt = a => a.length ? a.map(x => `• ${x}`).join("\n") : "—";
-        return api.sendMessage(
-          `👑 Store Admin: ${s.adminUid}\n` +
-          `━━━━━━━━━━━━━━━━━━\n` +
-          `👤 Premium Users:\n${fmt(s.premiumUsers)}\n` +
-          `━━━━━━━━━━━━━━━━━━\n` +
-          `☯ Premium Commands:\n${fmt(s.premiumCommands)}\n` +
-          `━━━━━━━━━━━━━━━━━━\n` +
-          `⛨ Premium Authors:\n${fmt(s.premiumAuthors)}`,
-          threadID
-        );
-      }
-
-      return api.sendMessage(
-        `📜 Premium Manager\n` +
-        `• ${prefix}gs pr add <uid>\n` +
-        `• ${prefix}gs pr remove <uid>\n` +
-        `• ${prefix}gs pr upload <cmdname>\n` +
-        `• ${prefix}gs pr delete <cmdname>\n` +
-        `• ${prefix}gs pr author add|remove <authorname>\n` +
-        `• ${prefix}gs pr list — show premium state\n` +
-        `• ${prefix}gs transfer <cmdname>`,
-        threadID
-      );
-    }
-
-    if (sub === "transfer") {
-      if (!premium.isAdmin(senderID)) return api.sendMessage("*store admin only cmd*", threadID);
-
-      const cmdName = args.slice(1).join(" ").trim();
-      if (!cmdName) return api.sendMessage(`❌ Usage: ${prefix}gs transfer <cmdname>`, threadID);
-
-      let matched = null;
-      try {
-        const res = await storeGet(`/miraistore/search?q=${encodeURIComponent(cmdName)}&kind=command&clientFp=${encodeURIComponent(senderID || "")}`);
-        const list = res.data?.commands || [];
-        const norm = s => String(s == null ? "" : s).trim().toLowerCase();
-        matched = list.find(c => norm(c.name) === norm(cmdName)) || null;
-      } catch (_) {
-      }
-
-      if (!matched) {
-        return api.sendMessage(
-          `⚠️ No public store command named "${cmdName}" found (exact match). ` +
-          `Marking it premium anyway — double-check the spelling.`,
-          threadID
-        );
-      }
-      if (premium.isPremiumCmd(matched.name, matched.author)) {
-        return api.sendMessage(`❌ "${matched.name}" is already premium.`, threadID);
-      }
-
-      const r = await premium.addPremiumCmd(matched.name, senderID);
-      return api.sendMessage(
-        r.ok
-          ? `✅ "${matched.name}" (by ${matched.author}) moved from public store to premium.`
-          : `❌ ${r.error}`,
-        threadID
-      );
-    }
-
-
-    maybeAutoUpdate(api, threadID).catch(() => {});
+    await maybeAutoUpdate(api, threadID).catch(() => {});
 
     if (!sub) {
       const updates = await getTodayUpdates(senderID);
 
       if (updates.length && !userSeenNoti.get(senderID)) {
         let n = `🔔 [ NOTIFICATION ]\nToday ${updates.length} GoatBot update(s)!\n━━━━━━━━━━━━━━━━━━\n`;
-        updates.forEach(f => { if (premium.isFiltered(f.name, f.author, senderID)) return; n += ` ‣ ${f.name} (ID: ${f.id})\n`; });
+        updates.forEach(f => { n += ` ‣ ${f.name} (ID: ${f.id})\n`; });
         n += `\n(Type "${prefix}gs n" for details or "${prefix}gs" again for menu)`;
         userSeenNoti.set(senderID, true);
         return api.sendMessage(n, threadID);
@@ -1233,17 +1050,16 @@ module.exports = {
         return api.sendMessage("📅 No GoatBot updates today.", threadID);
       let msg = `📂 Today's GoatBot Updates\n━━━━━━━━━━━━━━━━━━\n`;
       updates.forEach(cmd => {
-        if (premium.isFiltered(cmd.name, cmd.author, senderID)) return;
         msg += `╭─‣ ${cmd.name}\n├‣ ID: ${cmd.id}\n├‣ Type: ${typeBadge(cmd)}\n├‣ Author: ${cmd.author}\n╰────────────◊\n\n`;  });
       await api.sendMessage(msg.trim(), threadID);
       return;
     }
 
     if (sub === "sync") {
-      api.sendMessage("🔄 Starting manual sync...", threadID);
+      api.sendMessage(`🔄 Starting manual sync... (max ${SYNC_MAX_PER_MINUTE} files/minute)`, threadID);
       try {
-        await runAutoSync();
-        api.sendMessage("✅ Sync complete.", threadID);
+        const ran = await runAutoSync();
+        api.sendMessage(ran ? "✅ Sync complete." : "⏳ A sync is already running.", threadID);
       } catch (err) {
         api.sendMessage(`❌ Sync failed: ${err.message}`, threadID);
       }
@@ -1294,7 +1110,6 @@ module.exports = {
           if (!events.length) return api.sendMessage("❌ No GoatBot events found in store.", threadID);
           let msg = `📂 GoatBot Store Events (${res.data.total})\n\n`;
           events.forEach(cmd => {
-            if (premium.isFiltered(cmd.name, cmd.author, senderID)) return;
             msg += `╭─‣ ${cmd.name}\n├‣ ID : ${cmd.id}\n├‣ Author : ${authorLine(cmd)}\n╰────────────◊\n\n`;
           });
           msg += `💡 Use: ${prefix}gs -e install <id>`;
@@ -1309,7 +1124,6 @@ module.exports = {
         if (!events.length) return api.sendMessage(`❌ No GoatBot event found: "${action}"`, threadID);
         let msg = `📂 GoatBot Events matching "${action}"\n\n`;
         events.forEach(cmd => {
-          if (premium.isFiltered(cmd.name, cmd.author, senderID)) return;
           msg += `╭─‣ ${cmd.name}\n├‣ ID : ${cmd.id}\n├‣ Author : ${authorLine(cmd)}\n╰────────────◊\n\n`;
         });
         msg += `💡 Use: ${prefix}gs -e install <id>`;
@@ -1341,7 +1155,6 @@ module.exports = {
         if (!list.length) return api.sendMessage("❌ No trending files.", threadID);
         let msg = `🔥 Top Trending 🔥\n\n`;
         list.forEach((cmd, i) => {
-          if (premium.isFiltered(cmd.name, cmd.author, senderID)) return;
           msg +=
             `╭─‣ ${cmd.name}${i === 0 ? " 🏆" : ""}\n` +
             `├‣ Type : ${typeBadge(cmd)}\n` +
@@ -1400,13 +1213,7 @@ module.exports = {
       if (!data || data.message) return api.sendMessage("❌ Not found.", threadID);
 
       if (!isNaN(query) && !Array.isArray(data) && !data.commands) {
-        const isPrem = premium.isPremiumCmd(data.name, data.author);
-        if (isPrem && !premium.isPremiumViewer(senderID))
-          return api.sendMessage("*This command is premium only*", threadID);
-
-        const finalMsg = isPrem
-          ? resultBlock(data) + `💬 Reply "in" to install`
-          : (
+        const finalMsg = (
               `${typeBadge(data)}\n` +
               `╭─‣ Name : ${data.name}\n` +
               `├‣ Author : ${data.author}\n` +
@@ -1432,4 +1239,4 @@ module.exports = {
       return api.sendMessage(err.response?.data?.message || "❌ Search API error.", threadID);
     }
   }
-};
+});
