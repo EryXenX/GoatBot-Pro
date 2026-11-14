@@ -824,7 +824,17 @@ async function startBot(_0x3cad9e) {
             }
             return;
           }
-          if (_0x570bf7.error == "Not logged in" || _0x570bf7.error == "Not logged in." || _0x570bf7.error == "Connection refused: Server unavailable") {
+          if (_0x570bf7.error == "Connection refused: Server unavailable") {
+            // Transient network hiccup: Facebook's MQTT endpoint was briefly
+            // unreachable. This is NOT an auth failure — fca's autoReconnect
+            // already retries the socket. Restarting the whole bot here would
+            // re-login from the same IP on every blip, and that failed-auth
+            // burst is what escalates a temporary block into a suspension.
+            log.warn("LISTEN_MQTT", "Facebook MQTT endpoint unreachable (transient) — fca will reconnect, not restarting.");
+            global.statusAccountBot = "good";
+            return;
+          }
+          if (_0x570bf7.error == "Not logged in" || _0x570bf7.error == "Not logged in.") {
             const _safeErr2 = _0x570bf7 && typeof _0x570bf7 === 'object' ? { error: _0x570bf7.error || String(_0x570bf7) } : _0x570bf7;
             log.err("NOT LOGGEG IN", getText("login", "notLoggedIn"), _safeErr2);
             global.responseUptimeCurrent = responseUptimeError;
@@ -844,9 +854,9 @@ async function startBot(_0x3cad9e) {
               });
               _0x54729a = true;
             }
-            if (global.GoatBot.config.autoRestartWhenListenMqttError) {
-              process.exit(0x2);
-            }
+            // The session is dead until fresh cookies are supplied. Do NOT
+            // process.exit(2): index.js would restart and re-authenticate from
+            // the same IP, which is exactly what deepens the block.
             return;
           } else {
             if (_0x570bf7 == "Connection closed." || _0x570bf7 == "Connection closed by user.") {
