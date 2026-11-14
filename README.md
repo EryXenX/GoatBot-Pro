@@ -291,10 +291,18 @@ slower (or turn the delay off entirely) without touching the code:
 "humanizer": {
   "enable": true,      // false = reply instantly, no delay, no typing
   "delayMs": 3000,     // how long to wait (and show typing) before replying
-  "cooldownMs": 5500,  // min gap between two accepted commands, per thread
+  "cooldownMs": 5500,  // min gap before the SAME command can run again
+  "perCommand": true,  // true = cooldown per command; false = per thread
   "maxPerMinute": 20   // global cap on accepted commands
 }
 ```
+
+With `perCommand: true` (the default) the cooldown is keyed by command
+name, so different commands sent back to back — `/pp` then `/uid` — all run,
+while the same command repeated inside the window (`/pp`, `/pp`, `/pp`) is
+dropped. Set `perCommand: false` to restore a single per-thread cooldown
+that drops every command inside the window regardless of which command it
+is.
 
 `delayMs` also accepts a range, e.g. `[2000, 4000]`, for a random delay.
 The typing indicator always lasts exactly the delay, so the two never
