@@ -183,13 +183,15 @@ const CATEGORIES = [
 function renderReplyDelayMenu(config) {
 	const h = config.humanizer || {};
 	const delay = Array.isArray(h.delayMs) ? h.delayMs.join("-") : (h.delayMs ?? 3000);
+	const scope = h.perCommand !== false ? "Per-Command" : "Per-Thread";
 	const lines = [
 		`1. ${"Typing Indicator"} — ${status(config.enableTypingIndicator)}`,
 		`2. ${"Reply Delay"} — ${status(h.enable)}`,
 		`3. ${"Delay"} — ${delay}ms`,
-		`4. ${"Cooldown"} — ${h.cooldownMs ?? 5500}ms`
+		`4. ${"Cooldown"} — ${h.cooldownMs ?? 5500}ms`,
+		`5. ${"Cooldown Scope"} — ${scope}`
 	];
-	return renderBox("⌛", "Reply Delay (Humanizer)", ["Typing lasts exactly the delay"], "fields", lines, "Reply 1-4 · 0 to go back");
+	return renderBox("⌛", "Reply Delay (Humanizer)", ["Typing lasts exactly the delay"], "fields", lines, "Reply 1-5 · 0 to go back");
 }
 
 function renderCategoryList() {
@@ -258,7 +260,8 @@ module.exports = {
 							enabled: true,
 							reactDelayMs: config.humanizer.delayMs,
 							cooldownMs: config.humanizer.cooldownMs,
-							maxPerMinute: config.humanizer.maxPerMinute
+							maxPerMinute: config.humanizer.maxPerMinute,
+							perCommand: config.humanizer.perCommand !== false
 						});
 						h.enabled = true;
 					}
@@ -771,7 +774,13 @@ module.exports = {
 				return await sendAndListen(renderReplyDelayMenu(config), "typingIndicator");
 			}
 			if (num === 3) return await sendAndListen("› Reply with the delay in milliseconds (e.g. 3000 for 3s):", "humanizerDelaySet");
-			if (num === 4) return await sendAndListen("› Reply with the cooldown in milliseconds (min gap between two commands):", "humanizerCooldownSet");
+			if (num === 4) return await sendAndListen("› Reply with the cooldown in milliseconds (min gap before the SAME command can run again):", "humanizerCooldownSet");
+			if (num === 5) {
+				config.humanizer.perCommand = config.humanizer.perCommand === false;
+				saveConfig();
+				applyLiveHumanizer();
+				return await sendAndListen(renderReplyDelayMenu(config), "typingIndicator");
+			}
 			return await sendAndListen(renderReplyDelayMenu(config), "typingIndicator");
 		}
 		if (state === "humanizerDelaySet") {

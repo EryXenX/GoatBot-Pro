@@ -20,8 +20,9 @@
     "enable": true,
     "delayMs": 1000,
     "cooldownMs": 5500,
+    "perCommand": true,
     "maxPerMinute": 20,
-    "notes": "delayMs = how long the bot waits (and shows typing) before replying to a command. cooldownMs = min gap between two accepted commands per thread. maxPerMinute = global accepted-command cap. Set enable=false to reply instantly with no delay."
+    "notes": "delayMs = how long the bot waits (and shows typing) before replying to a command. cooldownMs = min gap before the SAME command can run again in a thread. perCommand = true keys that cooldown per command, so different commands (/pp then /uid) all run back-to-back while the same command repeated is dropped; false reverts to a single per-thread cooldown that drops every command in the window. maxPerMinute = global accepted-command cap. Set enable=false to reply instantly with no delay."
   },
   "noPrefix": {
     "enable": true,

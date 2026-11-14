@@ -24,7 +24,10 @@ function buildHumanizeOptions(config) {
                         : clampInt(h.delayMs, 0, 60000, 3000),
                 cooldownMs: clampInt(h.cooldownMs, 0, 600000, 5500),
                 maxPerMinute: clampInt(h.maxPerMinute, 0, 1000, 20),
-                perThread: h.perThread !== false
+                perThread: h.perThread !== false,
+                // Cooldown is keyed per command name, so "/pp" then "/uid" back to
+                // back both run while the same command repeated is still dropped.
+                perCommand: h.perCommand !== false
         };
 }
 
