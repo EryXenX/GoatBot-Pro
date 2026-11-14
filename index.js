@@ -20,6 +20,18 @@
 const { spawn } = require("child_process");
 const log = require("./logger/log.js");
 
+// Exit code 2 means "restart me" (listen error / session problem). Blindly
+// restarting on every such exit is what turns a temporary Facebook block into a
+// suspension: each restart re-authenticates from the same IP, and the
+// failed-auth burst raises the account risk score. Back off exponentially and
+// stop restarting after too many attempts in a short window so the operator can
+// fix the appstate by hand.
+const RESTART_WINDOW_MS = 10 * 60 * 1000;
+const MAX_RESTARTS_PER_WINDOW = 5;
+const BASE_BACKOFF_MS = 5000;
+const MAX_BACKOFF_MS = 5 * 60 * 1000;
+let restartTimes = [];
+
 function startProject() {
 	// No `shell: true`: passing an args array through a shell is deprecated
 	// (DEP0190) and the arguments would not be escaped.
@@ -29,10 +41,25 @@ function startProject() {
 	});
 
 	child.on("close", (code) => {
-		if (code == 2) {
-			log.info("Restarting Project...");
-			startProject();
+		if (code != 2) return;
+
+		const now = Date.now();
+		restartTimes = restartTimes.filter(t => now - t < RESTART_WINDOW_MS);
+
+		if (restartTimes.length >= MAX_RESTARTS_PER_WINDOW) {
+			log.err(
+				"RESTART",
+				`Refusing to restart: ${restartTimes.length} restarts in the last ` +
+				`${RESTART_WINDOW_MS / 60000} min. Facebook is likely blocking this ` +
+				`session — update account.txt with fresh cookies, then start the bot again.`
+			);
+			return;
 		}
+
+		const backoff = Math.min(BASE_BACKOFF_MS * Math.pow(2, restartTimes.length), MAX_BACKOFF_MS);
+		restartTimes.push(now);
+		log.info("RESTART", `Restarting Project... (attempt ${restartTimes.length}, waiting ${Math.round(backoff / 1000)}s)`);
+		setTimeout(startProject, backoff);
 	});
 }
 

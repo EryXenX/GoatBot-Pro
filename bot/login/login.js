@@ -798,6 +798,32 @@ async function startBot(_0x3cad9e) {
       async function _0x290401(_0x570bf7, _0xb100c2) {
         if (_0x570bf7) {
           global.responseUptimeCurrent = responseUptimeError;
+          // A blocked / invalidated session (login_blocked, account_inactive) is
+          // terminal until the operator supplies fresh cookies. Restarting here
+          // would re-authenticate with the same dead session and raise the
+          // account risk score, so report it once and stop instead of looping.
+          const _blockReason = _0x570bf7 && _0x570bf7.reason;
+          const _blockStr = String((_0x570bf7 && _0x570bf7.error) || _0x570bf7 || "");
+          if (_blockReason === "login_blocked" || _0x570bf7.type === "account_inactive" || /login_blocked|account_inactive/i.test(_blockStr)) {
+            global.statusAccountBot = "can't login";
+            log.err("SESSION", "Facebook blocked/invalidated this session (" + (_blockReason || _blockStr) + "). Not restarting — update account.txt with fresh cookies, then restart the bot.");
+            if (!_0x54729a) {
+              await handlerWhenListenHasError({
+                'api': _0x4d5048,
+                'threadModel': _0xedf862,
+                'userModel': _0x5c414a,
+                'dashBoardModel': _0x1f9059,
+                'globalModel': _0x366d79,
+                'threadsData': _0x3b31e7,
+                'usersData': _0x84ef91,
+                'dashBoardData': _0x59866b,
+                'globalData': _0x2a1319,
+                'error': _0x570bf7
+              });
+              _0x54729a = true;
+            }
+            return;
+          }
           if (_0x570bf7.error == "Not logged in" || _0x570bf7.error == "Not logged in." || _0x570bf7.error == "Connection refused: Server unavailable") {
             const _safeErr2 = _0x570bf7 && typeof _0x570bf7 === 'object' ? { error: _0x570bf7.error || String(_0x570bf7) } : _0x570bf7;
             log.err("NOT LOGGEG IN", getText("login", "notLoggedIn"), _safeErr2);
