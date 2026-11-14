@@ -9,3 +9,7 @@ goatstore_dircache.json
 goatstore_sync_cache.json
 scripts/cmds/cache/*.json
 database/data/*.sqlite-journal
+
+# E2EE device store and debug frame dumps written at runtime.
+.nexca/
+outbound_frames.log
