@@ -804,7 +804,7 @@ async function startBot(_0x3cad9e) {
           // account risk score, so report it once and stop instead of looping.
           const _blockReason = _0x570bf7 && _0x570bf7.reason;
           const _blockStr = String((_0x570bf7 && _0x570bf7.error) || _0x570bf7 || "");
-          if (_blockReason === "login_blocked" || _0x570bf7.type === "account_inactive" || /login_blocked|account_inactive/i.test(_blockStr)) {
+          if (_blockReason === "login_blocked" || _blockReason === "checkpoint" || _0x570bf7.type === "account_inactive" || /login_blocked|account_inactive|checkpoint/i.test(_blockStr)) {
             global.statusAccountBot = "can't login";
             log.err("SESSION", "Facebook blocked/invalidated this session (" + (_blockReason || _blockStr) + "). Not restarting — update account.txt with fresh cookies, then restart the bot.");
             if (!_0x54729a) {
