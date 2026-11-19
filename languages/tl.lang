@@ -1,0 +1,155 @@
+# index.js
+Goat.newVersionDetected=Gumagamit ka ng bersyon %1, ang pinakabagong bersyon ay %2. Mangyaring i-update para mas magamit ang bot: %3
+Goat.autoRestart1=Awtomatikong mag-restart ang bot sa loob ng %1
+Goat.autoRestart2=Awtomatikong mag-restart ang bot ayon sa cron job: %1
+Goat.googleApiTokenExpired=Nag-expire o na-revoke ang Google API refresh token, mangyaring kumuha ng bagong token sa https://developers.google.com/oauthplayground/
+
+# bot/login/login.js
+login.currentlyLogged=Naglo-login na
+login.notFoundDirAccount=Hindi mahanap ang file na %1
+login.loginToken=Naglo-login gamit ang access token
+login.loginCookieString=Naglo-login gamit ang cookie string
+login.loginCookieNetscape=Naglo-login gamit ang cookie netscape
+login.loginCookieArray=Naglo-login gamit ang cookie array
+login.loginPassword=Naglo-login gamit ang email at password...
+login.accountError=Mangyaring ilagay ang full permission token sa anyo ng %1 o cookie sa anyo ng string %2 o cookie sa anyo ng array:\n[\n  { name: %3, value: %4 },\n  { name: %5, value: %6 }\n]\n o\n[\n  { key: %3, value: %4 },\n  { key: %5, value: %6 }\n]\nsa file na %7
+login.cannotFindAccount=Hindi mahanap ang Facebook account, pumili sa mga sumusunod na opsyon:
+login.chooseAccount=Mag-login gamit ang email at password
+login.chooseToken=Mag-login gamit ang full permission token
+login.chooseCookieString=Mag-login gamit ang cookie string
+login.chooseCookieArray=Mag-login gamit ang cookie array
+login.loginWith=Pinili mo ang %1
+login.inputEmail=> Mangyaring ilagay ang iyong email (id) o phone number ng Facebook:
+login.inputPassword=> Mangyaring ilagay ang iyong password:
+login.input2FA=> Mangyaring ilagay ang 2FA code (iwanang blangko kung wala kang 2FA):
+login.inputToken=> Mangyaring ilagay ang full permission token (nagsisimula sa EAAAA):
+login.inputCookieString=> Mangyaring ilagay ang cookie string:
+login.inputCookieArray=> Mangyaring ilagay ang cookie array:
+login.refreshCookie=Nire-refresh ang cookie...
+login.refreshCookieError=May naganap na error habang nire-refresh ang cookie
+login.refreshCookieSuccess=Matagumpay na na-refresh ang cookie, i-restart ang bot para gamitin ang bagong cookie
+login.refreshCookieWarning=Naka-enable ang auto refresh cookie mode, ngunit hindi pa na-configure ang email at password sa config.json
+login.tokenError=Ang token ay hindi wasto o nag-expire na. Mangyaring ilagay ang full permission token sa anyo ng %1 sa file na %2
+login.cookieError=Ang cookie ay hindi wasto o nag-expire na.
+login.loginPasswordError=May naganap na error habang naglo-login gamit ang email at password sa config.json
+login.loginSuccess=Matagumpay na naka-login
+login.loginError=May naganap na error habang naglo-login
+login.openDashboardSuccess=Matagumpay na nabuksan ang pahina ng pamamahala ng bot
+login.openDashboardError=May naganap na error habang binubuksan ang pahina ng pamamahala ng bot
+login.changeGbanData=BINAGO ANG DATA, KASALUKUYANG HINDI MAAARING ILUNSAD ANG BOT
+login.errorNoti=May naganap na error habang kinukuha ang mensahe
+login.refreshFbstateSuccess=Na-refresh ang file na %1
+login.refreshFbstateError=May naganap na error habang nire-refresh ang file na %1
+login.youAreBanned=Na-ban ka mula sa Goat-Bot project
+login.runBot=Matagumpay na inilunsad ang bot, nagsimula nang tumatanggap ng mga mensahe mula sa mga gumagamit
+login.notLoggedIn=May naganap na error, mangyaring suriin muli ang iyong Facebook account
+login.callBackError=May naganap na error sa callback na listenMqtt
+login.userBanned=Na-ban ka mula sa paggamit ng bot!!
+login.checkGbanError=May naganap na error habang sinusuri ang GBAN, subukang i-update sa pinakabagong bersyon (buksan ang cmd at i-type: node update)
+login.gbanMessage=Na-ban ka mula sa Goat-Bot project noong %1 dahil sa: %2\n» Oras: %3
+login.gbanMessageToDate=Na-ban ka mula sa Goat-Bot project noong %1 dahil sa: %2\n» Oras: %3\n» Hanggang: %4
+login.gbanAdminMessage=Ang gumagamit na %1 ay na-ban mula sa Goat-Bot project noong %2 dahil sa: %3
+login.openServerUptimeSuccess=🚀 Nabuksan ang uptime server: %1
+login.openServerUptimeError=May naganap na error, hindi mabuksan ang uptime server
+login.restartListenMessage=Naka-enable ang pag-restart ng ListenMQTT tuwing %1
+login.stopRestartListenMessage=Naka-disable ang pag-restart ng ListenMQTT
+login.restartListenMessageError=May naganap na error habang nire-restart ang ListenMQTT
+login.restartListenMessage2=Matagumpay na na-restart ang ListenMQTT
+login.refreshCookieAfter=Awtomatikong ire-refresh ang cookie pagkatapos ng %1
+login.listenMqttClose=Sarado ang ListenMQTT
+login.listenMqttCloseByUser=Isinara ng gumagamit ang ListenMQTT
+login.retryCheckLiveCookie=Sinusuri muli ang cookie... %1
+login.startBotSuccess=Matagumpay na nagsimula ang bot, nagsimula nang tumatanggap ng mga mensahe
+
+version.tooOldVersion=Gumagamit ka ng masyadong lumang bersyon ng Goat-Bot, mangyaring i-update sa pinakabagong bersyon sa pamamagitan ng pag-type ng: %1
+
+# bot/custom.js
+custom.refreshedFb_dtsg=Matagumpay na na-refresh ang fb_dtsg at jazoest
+custom.refreshedFb_dtsgError=May naganap na error habang nire-refresh ang fb_dtsg at jazoest
+
+# bot/login/loadData.js
+loadData.loadThreadDataSuccess=Matagumpay na na-load ang data ng %1 grupo!
+loadData.loadUserDataSuccess=Matagumpay na na-load ang data ng %1 gumagamit!
+loadData.refreshingThreadData=Ina-update ang impormasyon ng mga grupo...
+loadData.refreshThreadDataSuccess=Na-update ang impormasyon ng %1 grupo!
+loadData.refreshThreadDataError=May naganap na error habang ina-update ang impormasyon ng mga grupo!
+
+# bot/login/loadScripts.js
+loadScripts.loadScriptsError=Ang %1 na mga file ay may error habang naglo-load:
+loadScripts.loadScriptsNotMatchOrigin=Ang %1 na mga file ay hindi tugma sa orihinal na mga file sa github ng project:
+loadScripts.NOT_FOUND=HINDI NAHANAP SA ORIHINAL NA SOURCE CODE:
+loadScripts.NOT_MATCH=HINDI TUGMA SA ORIHINAL NA SOURCE CODE:
+
+# bot/login/socketIO.js
+socketIO.connected=Nakakonekta sa socket.io server
+socketIO.error=May naganap na error habang kumokonekta sa socket.io server
+
+# bot/handler/handlerCheckData.js
+handlerCheckData.cantCreateThread=Hindi ma-isulat sa database ang grupo na may id na '%1'!
+handlerCheckData.cantCreateUser=Hindi ma-isulat sa database ang gumagamit na may id na '%1'!
+
+# bot/handler/handlerEvents.js
+handlerEvents.userBanned=⦸ Na-ban na Gumagamit\n━━━━━━━━━━━━━━━━━\n› Dahilan : %1\n› Oras    : %2\n› User    : %3
+handlerEvents.threadBanned=⦸ Na-ban na Grupo\n━━━━━━━━━━━━━━━━━\n› Dahilan : %1\n› Oras    : %2\n› Thread  : %3
+handlerEvents.onlyAdminBox=⛉ Admin Lamang\n━━━━━━━━━━━━━━━━━\n› Ang admin lamang ng grupo ang makakapaggamit ng bot.
+handlerEvents.onlyAdminBot=ⴵ Limitado\n━━━━━━━━━━━━━━━━━\n› Para sa admin ng bot lamang ito.
+handlerEvents.prefixOnly=𝗛𝗲𝘆! Aktibo ako\n━━━━━━━━━━━━━━━━━\n› I-type ang %1help para makita ang lahat ng command
+handlerEvents.commandNotFoundSuggestion=𝗫 Hindi Nahanap ang Command\n━━━━━━━━━━━━━━━━━\n✦ Ibig mo bang sabihin?\n%1
+handlerEvents.commandSyntaxError=𝗫 Mali ang Syntax\n━━━━━━━━━━━━━━━━━\n› Gamitin ang %1help %2 para makita ang tamang paggamit.
+handlerEvents.onlyAdmin=⛉ Admin Lamang\n━━━━━━━━━━━━━━━━━\n› Ang admin lamang ng grupo ang makakapaggamit ng "%1".
+handlerEvents.onlyAdminToUseOnReply=⛉ Admin Lamang\n━━━━━━━━━━━━━━━━━\n› Ang admin lamang ang makaka-reply sa "%1".
+handlerEvents.onlyAdminToUseOnReaction=⛉ Admin Lamang\n━━━━━━━━━━━━━━━━━\n› Ang admin lamang ang makaka-react sa "%1".
+handlerEvents.onlyAdminBot2=ⴵ Limitado\n━━━━━━━━━━━━━━━━━\n› Ang "%1" ay para sa admin ng bot lamang.
+handlerEvents.onlyAdminBot2ToUseOnReply=ⴵ Limitado\n━━━━━━━━━━━━━━━━━\n› Ang pag-reply sa "%1" ay para sa admin ng bot lamang.
+handlerEvents.onlyAdminBot2ToUseOnReaction=ⴵ Limitado\n━━━━━━━━━━━━━━━━━\n› Ang pag-react sa "%1" ay para sa admin ng bot lamang.
+handlerEvents.waitingForCommand=ⴵ Cooldown\n━━━━━━━━━━━━━━━━━\n› Mangyaring maghintay ng %1s bago gamitin muli ito.
+handlerEvents.errorOccurred=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› Cmd : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.errorOccurred2=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› onChat : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.errorOccurred3=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› onReply : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.errorOccurred4=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› onReaction : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.errorOccurred5=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› onEvent : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.errorOccurred6=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› onEvent : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.errorOccurred7=𝗫 Error [ %1 ]\n━━━━━━━━━━━━━━━━━\n› onAnyEvent : "%2"\n━━━━━━━━━━━━━━━━━\n%3
+handlerEvents.cannotFindCommandName=𝗫 Nabigo\n━━━━━━━━━━━━━━━━━\n› Hindi mahanap ang pangalan ng command para sa reply na ito.
+handlerEvents.cannotFindCommand=𝗫 Nabigo\n━━━━━━━━━━━━━━━━━\n› Hindi mahanap ang command na "%1" para sa reply na ito.
+
+# bot/autoUptime.js
+autoUptime.autoUptimeTurnedOn=Naka-on ang AutoUptime mode
+
+# database/controller/index.js
+indexController.connectingMongoDB=Kumokonekta sa MONGODB database
+indexController.connectMongoDBSuccess=Matagumpay na nakakonekta sa MongoDB database!
+indexController.connectMongoDBError=May naganap na error habang kumokonekta sa MongoDB database:
+indexController.connectingMySQL=Kumokonekta sa SQLITE database
+indexController.connectMySQLSuccess=Matagumpay na nakakonekta sa SQLITE database!
+indexController.connectMySQLError=May naganap na error habang kumokonekta sa SQLITE database:
+
+# updater.js
+updater.updateTooFast=Mangyaring maghintay ng hindi bababa sa 5 minuto pagkatapos ng pinakabagong commit, %1 minuto %2 segundo pa ang natitira
+updater.latestVersion=Gumagamit ka ng pinakabagong bersyon
+updater.cantFindVersion=Gumagamit ka ng hindi natukoy na bersyon (%1), mangyaring suriin ang iyong package.json file
+updater.newVersions=Mayroong %1 bagong bersyon na ia-update, nagsisimula nang mag-update...
+updater.updateSuccess=Matagumpay na na-update%1
+updater.configChanged=Nabago ang %1, mangyaring suriin muli ang iyong config.json file
+updater.installingPackages=Ini-install ang mga dependency para sa bot...
+updater.installSuccess=Matagumpay na na-install ang mga dependency, i-restart ang bot para gamitin ang bagong bersyon
+updater.backupSuccess=Matagumpay na nai-backup ang mga nabagong file, tingnan sa folder na %1
+updater.restartToApply=. I-restart ang bot para mailapat ang bagong bersyon
+updater.skipFile=Mayroon nang bagong bersyon ng file na %1, ngunit nilaktawan mo ang file na ito sa proseso ng pag-update gamit ang comment na %2
+
+# dashboard/routes/verifyfbid.js
+verifyfbid.sendCode=Ang iyong verification code ay:\n%1\nAng verification code ay may bisa sa loob ng %2 minuto
+
+# utils.js
+utils.errorOccurred=❌ May naganap na error:\n\n%1
+
+# for command
+command.restartedBot=Na-restart ang bot
+
+# dashboard/app.js
+app.googleApiRefreshTokenExpired=Nag-expire o na-revoke ang Google API refresh token, mangyaring kumuha ng bagong token sa https://developers.google.com/oauthplayground/
+app.tooManyRequests=Napakaraming kahilingan sa nakalipas na minuto. Mangyaring subukan muli sa ibang pagkakataon.
+app.notPermissionChangeFbstate=Wala kang pahintulot na baguhin ang fbstate!
+app.notFoundFbstate=Mangyaring ilagay ang fbstate!
+app.changedFbstateSuccess=Matagumpay na nabago ang fbstate!
+app.serverError=May error ang server, mangyaring subukan muli sa ibang pagkakataon!
